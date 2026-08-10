@@ -23,10 +23,10 @@ ever observed.
 ## Setup
 
 ```bash
-npm install
-npx wrangler d1 create uk-car-finder      # paste database_id into wrangler.jsonc
-npx wrangler d1 migrations apply uk-car-finder --remote
-npm run deploy
+pnpm install
+pnpm exec wrangler d1 create uk-car-finder      # paste database_id into wrangler.jsonc
+pnpm exec wrangler d1 migrations apply uk-car-finder --remote
+pnpm run deploy
 ```
 
 Then protect it: in the Cloudflare dashboard go to your Worker →
@@ -36,9 +36,9 @@ needed, and no auth code in the app.
 ### Local development
 
 ```bash
-npm run db:local     # apply the schema to a local D1
-npm run dev          # worker + built SPA on :8787
-npm run dev:web      # optional: Vite dev server with HMR, proxying /api to :8787
+pnpm run db:local     # apply the schema to a local D1
+pnpm run dev          # worker + built SPA on :8787
+pnpm run dev:web      # optional: Vite dev server with HMR, proxying /api to :8787
 ```
 
 Trigger the cron by hand:
@@ -69,10 +69,10 @@ everything else works normally.
 
 | Command | What it does |
 |---|---|
-| `npm test` | Unit tests + D1/cron tests in real workerd |
-| `npm run smoke` | Live check against AutoTrader — detects schema drift |
-| `npm run typecheck` | Worker and SPA |
-| `npm run build` | Build the SPA into `web/dist` |
+| `pnpm test` | Unit tests + D1/cron tests in real workerd |
+| `pnpm run smoke` | Live check against AutoTrader — detects schema drift |
+| `pnpm run typecheck` | Worker and SPA |
+| `pnpm run build` | Build the SPA into `web/dist` |
 
 ## How it works
 
@@ -102,7 +102,7 @@ AutoTrader along the way.
 - There is no public AutoTrader API. This uses the same endpoints their website
   does, at personal volume with ~500ms between requests. Keep it that way —
   the request rate is what keeps this uncontroversial.
-- Their schema is undocumented and can change without notice. `npm run smoke` is
+- Their schema is undocumented and can change without notice. `pnpm run smoke` is
   how you find out.
 - No credentials are needed to search, and none are stored.
 - Test fixtures are real, publicly-listed AutoTrader adverts, kept because they

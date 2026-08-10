@@ -5,6 +5,32 @@ discovered about AutoTrader that aren't obvious from the code. Newest first.
 
 ---
 
+## 2026-08-10 — Switch to pnpm
+
+Project scaffolded with npm; converted at request. `packageManager` is now
+pinned in package.json so the choice sticks, and the `deploy` script calls
+`pnpm run build` rather than shelling out to npm.
+
+pnpm's non-hoisted `node_modules` is the thing that usually breaks a conversion
+like this, so everything was re-verified rather than assumed: typecheck, build,
+all 72 tests, the live smoke run, and `wrangler dev` serving the API, cron and
+SPA. Nothing needed a workaround — no `.npmrc`, no `shamefully-hoist`.
+
+### The smoke test was crying wolf
+
+It failed on the MINI combo — 0 results — while Mazda and the detail page passed.
+Checking directly: 938 MINI Coopers exist, and 1 matches the tight spec but now
+sits above the £7k cap. The £6,550 car from yesterday's run had gone. So the
+pipeline was fine; the market had moved.
+
+The script was asserting that *every* combo returns listings, which makes it fail
+for reasons that aren't defects. A smoke test that fails routinely gets ignored,
+and this one exists to catch schema drift — a signal worth protecting. It now
+skips field checks for an empty combo and only fails if *all* combos come back
+empty, which really would suggest a broken query.
+
+---
+
 ## 2026-08-10 — Initial build
 
 ### Reconnaissance
@@ -111,8 +137,8 @@ history and a FAILED import check, one with no `vehicleCheck` block at all, and
 one with no seller name. D1 and cron-job tests run inside real workerd via
 `@cloudflare/vitest-pool-workers`.
 
-`npm run smoke` hits the live gateway with the two real combos. It is not in
-`npm test` — schema drift is the long-term failure mode here, and this is the
+`pnpm run smoke` hits the live gateway with the two real combos. It is not in
+`pnpm test` — schema drift is the long-term failure mode here, and this is the
 thing that will detect it.
 
 ### Still to do

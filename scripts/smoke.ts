@@ -57,6 +57,7 @@ function check(condition: boolean, message: string): void {
 
 async function main(): Promise<void> {
   let sampleAdvertId: string | null = null;
+  let combosWithResults = 0;
 
   for (const combo of COMBOS) {
     console.log(`\n${combo.label}`);
@@ -64,7 +65,16 @@ async function main(): Promise<void> {
     const { listings, totalResults, pagesFetched } = await searchAll(filters, { maxPages: 2 });
 
     console.log(`  ${totalResults} results across ${pagesFetched} page(s) fetched`);
-    check(listings.length > 0, 'search returned listings');
+
+    // A tightly-scoped combo legitimately returns nothing on a given day — cars
+    // sell. Failing on that would make this script cry wolf and train us to
+    // ignore it, which defeats the point. An empty *run* is the real signal.
+    if (listings.length === 0) {
+      console.log('  — no matches right now; skipping field checks');
+      continue;
+    }
+    combosWithResults++;
+
     check(
       listings.every((l) => l.advertId && l.detailPath.startsWith('/car-details/')),
       'every listing has an id and detail path',
@@ -78,6 +88,11 @@ async function main(): Promise<void> {
 
     sampleAdvertId ??= listings[0]?.advertId ?? null;
   }
+
+  console.log('');
+  // Every combo coming back empty is far more likely to be a broken query than
+  // a genuinely empty market, so that does fail.
+  check(combosWithResults > 0, 'at least one combo returned results');
 
   const advertId: string | null = sampleAdvertId;
   if (advertId === null) {
