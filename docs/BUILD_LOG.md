@@ -5,6 +5,123 @@ discovered about AutoTrader that aren't obvious from the code. Newest first.
 
 ---
 
+## 2026-08-10 — Facet-driven filters with a Make/Model/Variant cascade
+
+The editor was ten free-text boxes covering only the fields from the original
+worked example. Now it renders AutoTrader's own filters, from AutoTrader's own
+data.
+
+### The find
+
+`SearchResultsFacetsWithGroupsQuery`, lifted from their SPA bundle. It is the
+query that populates AutoTrader's own dropdowns, on the same public gateway we
+already use. Asking for **one** facet returns **all 34**, each with per-option
+labels, values and live result counts, plus `facetGroups` giving their 27 UI
+groups and human titles. 0.58s for the lot.
+
+The cascade needs no taxonomy of ours: pass the filters chosen so far and
+AutoTrader returns the valid children. Verified live — 155 makes, `model` empty
+until a make is picked then 14 for MINI, `aggregated_trim` 8 for MINI Cooper.
+
+### The consequence: stop hard-coding filters
+
+`Combo` was ten typed fields, and adding one meant editing five files. It is now
+an open bag keyed by AutoTrader's own filter names:
+
+```ts
+interface Combo { id: string; label: string; filters: Record<string, string[]> }
+```
+
+`buildFilters` is nearly a pass-through, `parseCombos` is a generic validator,
+and the UI renders whatever the facet API returns. Filters AutoTrader adds later
+appear on their own. No SQL migration was needed — combos are a JSON blob — but
+`migrateCombo()` converts pre-refactor combos on read, and is idempotent.
+
+Multi-select is real and now supported throughout: `fuel_type: [Petrol]` → 8,835,
+`[Diesel]` → 1,141, `[Petrol, Diesel]` → 9,976. Exact OR.
+
+### Verification survived, and grew
+
+`match.ts` is what caught AutoTrader returning a £17,250 car for an £8,000 combo,
+so it was kept and extended to fuel type, body type, doors and confirmed
+write-offs — all already parsed and stored. It reads from the bag now.
+
+`aggregated_trim` is deliberately **not** verified: trim exists only inside the
+free-text `subTitle`, so any check would be substring guesswork that discards
+real matches. Trusted to AutoTrader, and commented as such.
+
+### Two bugs the work surfaced
+
+- **A duplicate distance control.** `buildGroups` marked search-level facets as
+  used but still emitted their *group*, so "Distance from you" would have
+  appeared inside every combo despite living on the search. Caught by a test
+  written before looking at the UI.
+- **`GROUP_CONCAT(combo_label)` splits on a comma**, so a label containing one
+  corrupted `matchedCombos`. Reachable now that labels are auto-generated from
+  multi-select values. Switched to a unit separator — and since SQLite rejects
+  `GROUP_CONCAT(DISTINCT x, sep)`, deduping moved to JS.
+
+### UI notes
+
+- 27 collapsed accordion groups in AutoTrader's structure, each showing a summary
+  of its selection ("MINI · Cooper", "£5,500 – £7,000") so a combo reads without
+  opening anything.
+- **AutoTrader returns their groups roughly alphabetically**, which buried "Make
+  and model" eighteen rows down. A priority list pulls the groups a search
+  actually starts from to the front; the rest keep AutoTrader's order.
+- Widget choice is structural, not a lookup: a `min_`/`max_` filter pair renders
+  as two dropdowns, everything else as a multi-select. An invented `min_wingspan`
+  /`max_wingspan` facet would render correctly, which is the point.
+- Type-to-filter appears above 12 options, so 155 makes are usable on a phone.
+- Facet responses are cached in D1 (1h TTL, keyed by filter context) and a stale
+  copy is served if AutoTrader is unreachable — stale dropdowns beat none.
+
+### Follow-up: collapsible combination panels
+
+Review feedback: each combination panel should collapse to its name. With 27
+accordion groups inside each, two combinations made the editor about 4,000px
+tall before you could reach the save button.
+
+Panels now collapse to a header row showing the combo name and its active filter
+count. A combination that already has a make opens collapsed — it is configured,
+so editing a saved search stays scannable — while a fresh one opens expanded
+because it needs filling in. Collapsed panels also skip their facet fetch, which
+removes a round trip per combination on load.
+
+### Follow-up: narrowing a filter didn't remove excluded cars
+
+Reported: reducing a combo's price range left the dearer cars on screen.
+
+Root cause, not the symptom: a row in `search_listings` is written when a
+listing matches and is **never re-evaluated**. The only deletions were dropping
+a whole search, and `drain.ts` unlinking when a detail page contradicts a combo.
+So lowering `max_price` meant AutoTrader simply stopped returning that car — and
+with nothing touching its existing link, `getResults` kept serving it. The same
+hole meant a listing could keep crediting a combo it no longer satisfied.
+
+Fixed by enforcing the missing invariant at read time: every credit is re-checked
+against the combo *as it stands now*, via `storedListingMatches()` — which reuses
+the same two matchers as the ingest path, so there is one definition of "matches"
+rather than a second copy that drifts. Credits that no longer hold are dropped;
+a listing left with none disappears. This also means an edit takes effect
+immediately rather than after the next 4-hourly run.
+
+Reproduced live before fixing: a Mazda2 combo capped at £12,000 returned 35 cars;
+lowering the cap to £7,000 left all 35 on screen. After the fix, 6, none above
+the cap, with no refresh.
+
+One existing test had to change: it linked a combo that was not in the saved
+search, which `refreshSearch` would never do. Its setup was wrong, not the new
+assertion.
+
+### Self-inflicted note
+
+Running `wrangler d1 execute --local` while `wrangler dev` was up killed workerd
+with `SQLITE_BUSY: database is locked`. Stop the dev server before touching the
+local D1.
+
+---
+
 ## 2026-08-10 — Trim fixtures after a secret-scanning alert
 
 GitHub flagged a leaked Google API key in the fixtures. It is AutoTrader's own

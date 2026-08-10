@@ -10,8 +10,19 @@ import type {
   SavedSearch,
   SearchListing,
 } from '../types';
+import { migrateCombos } from './migrateCombo';
+import { storedListingMatches } from '../autotrader/match';
 
 const now = () => new Date().toISOString();
+
+/**
+ * Combo labels are aggregated with GROUP_CONCAT. The default separator is a
+ * comma, which a label like "MINI Cooper, Clubman" would split on and corrupt.
+ * A unit separator cannot occur in a label typed by a human.
+ */
+const LABEL_SEPARATOR = '\x1f';
+/** Separates combo id from label within one aggregated entry. */
+const FIELD_SEPARATOR = '\x1e';
 
 /* ------------------------------------------------------------------ searches */
 
@@ -32,7 +43,9 @@ function toSavedSearch(row: SearchRow): SavedSearch {
     name: row.name,
     postcode: row.postcode,
     radius: row.radius === 'national' ? 'national' : Number(row.radius),
-    combos: JSON.parse(row.combos_json) as Combo[],
+    // Combos saved before filters became an open bag are converted on read;
+    // the column is a JSON blob, so there is no SQL migration to run.
+    combos: migrateCombos(JSON.parse(row.combos_json)),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     lastRunAt: row.last_run_at,
@@ -469,7 +482,12 @@ export async function getResults(
   const { results } = await db
     .prepare(
       `SELECT l.*,
-              GROUP_CONCAT(DISTINCT sl.combo_label) AS combo_labels,
+              -- id and label together, so each credit can be matched back to
+              -- the combo that claims it. SQLite rejects
+              -- GROUP_CONCAT(DISTINCT x, sep), so dedupe in JS instead — a
+              -- listing matches only a handful of combos.
+              GROUP_CONCAT(sl.combo_id || '${FIELD_SEPARATOR}' || sl.combo_label,
+                           '${LABEL_SEPARATOR}') AS combo_labels,
               MIN(sl.first_seen_run_id) AS first_seen_run_id,
               (SELECT MAX(price) FROM listing_prices p WHERE p.advert_id = l.advert_id) AS high_price,
               (SELECT COUNT(*) FROM starred s WHERE s.advert_id = l.advert_id) AS starred
@@ -518,7 +536,9 @@ export async function getResults(
       sellerType: row.seller_type,
       location: row.location,
       imageUrl: row.image_url,
-      matchedCombos: row.combo_labels ? row.combo_labels.split(',') : [],
+      // Filled in below, once each credit has been re-checked against the
+      // combo as it stands now.
+      matchedCombos: [],
       firstSeenAt: row.first_seen_at,
       lastSeenAt: row.last_seen_at,
       detailFetchedAt: row.detail_fetched_at,
@@ -530,9 +550,33 @@ export async function getResults(
     };
   });
 
+  // Re-check every credit against the combo's current filters. A link is
+  // written when a listing matches and is never revisited, so narrowing a combo
+  // would otherwise leave the newly-excluded cars on screen — AutoTrader just
+  // stops returning them, and nothing removes the existing link.
+  const combosById = new Map((await getSearch(db, searchId))?.combos.map((c) => [c.id, c]) ?? []);
+
+  const verified: ResultListing[] = [];
+  for (const [index, listing] of mapped.entries()) {
+    const credits = (results[index]?.combo_labels ?? '')
+      .split(LABEL_SEPARATOR)
+      .filter(Boolean)
+      .map((entry) => entry.split(FIELD_SEPARATOR)[0]!);
+
+    const stillMatching = [...new Set(credits)]
+      // A combo deleted from the search stops crediting anything.
+      .map((id) => combosById.get(id))
+      .filter((combo): combo is Combo => combo !== undefined)
+      .filter((combo) => storedListingMatches(listing, combo).matches);
+
+    if (stillMatching.length === 0) continue;
+    // Use the combo's current label rather than the one stored at link time.
+    verified.push({ ...listing, matchedCombos: stillMatching.map((c) => c.label) });
+  }
+
   // Only PASSED counts as cleared: an advert with no vehicleCheck block reports
   // UNKNOWN, and hiding those is the point of ticking the box.
-  return opts.excludeWriteOffs ? mapped.filter((l) => l.writeOff === 'PASSED') : mapped;
+  return opts.excludeWriteOffs ? verified.filter((l) => l.writeOff === 'PASSED') : verified;
 }
 
 /* -------------------------------------------------------------------- starring */

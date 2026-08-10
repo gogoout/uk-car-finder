@@ -3,7 +3,10 @@ import * as db from './db/queries';
 import { refreshAllSearches, refreshSearch } from './jobs/refresh';
 import { drainDetailQueue } from './jobs/drain';
 import { fetchMotHistory, isMotConfigured } from './mot/dvsa';
-import type { Combo, SavedSearch } from './types';
+import { fetchFacets } from './autotrader/facets';
+import { getFacets, pruneFacetCache } from './db/facetCache';
+import { searchLevelFilters, type FilterInput } from './autotrader/filters';
+import { FILTER, type Combo, type FilterSelections, type SavedSearch } from './types';
 
 export interface Env {
   DB: D1Database;
@@ -27,39 +30,74 @@ function shortId(length = 8): string {
 
 class BadRequest extends Error {}
 
+/** Guard rails on the open filter bag — the keys are AutoTrader's, not ours. */
+const MAX_FILTERS_PER_COMBO = 60;
+const MAX_VALUES_PER_FILTER = 60;
+const FILTER_NAME_RE = /^[a-z0-9_]{1,64}$/;
+
+/**
+ * Validates a combo's filter bag without enumerating the filters themselves —
+ * AutoTrader's facet API decides what exists, so hard-coding a list here would
+ * silently drop anything new. Unknown names are rejected by their gateway with
+ * a clear error, which is a better place for that check than here.
+ */
+function parseFilters(input: unknown, index: number): FilterSelections {
+  if (input === undefined || input === null) return {};
+  if (typeof input !== 'object' || Array.isArray(input)) {
+    throw new BadRequest(`Combination ${index + 1} has an invalid filters object`);
+  }
+
+  const entries = Object.entries(input as Record<string, unknown>);
+  if (entries.length > MAX_FILTERS_PER_COMBO) {
+    throw new BadRequest(`Combination ${index + 1} has too many filters`);
+  }
+
+  const filters: FilterSelections = {};
+  for (const [name, raw] of entries) {
+    if (!FILTER_NAME_RE.test(name)) {
+      throw new BadRequest(`Invalid filter name: ${name}`);
+    }
+    if (!Array.isArray(raw)) {
+      throw new BadRequest(`Filter ${name} must be an array of values`);
+    }
+    if (raw.length > MAX_VALUES_PER_FILTER) {
+      throw new BadRequest(`Filter ${name} has too many values`);
+    }
+
+    const values = raw
+      .filter((v) => v !== null && v !== undefined && v !== '')
+      .map((v) => String(v).slice(0, 200));
+
+    // An empty selection is the absence of the filter, not an empty array —
+    // AutoTrader rejects the latter.
+    if (values.length > 0) filters[name] = values;
+  }
+
+  return filters;
+}
+
 function parseCombos(input: unknown): Combo[] {
   if (!Array.isArray(input) || input.length === 0) {
     throw new BadRequest('At least one search combination is required');
   }
 
   return input.map((raw, index): Combo => {
-    const combo = raw as Partial<Combo>;
-    if (!combo.make) throw new BadRequest(`Combination ${index + 1} needs a make`);
+    const combo = (raw ?? {}) as Partial<Combo>;
+    const filters = parseFilters(combo.filters, index);
 
-    const num = (value: unknown): number | undefined => {
-      if (value === undefined || value === null || value === '') return undefined;
-      const parsed = Number(value);
-      if (!Number.isFinite(parsed)) throw new BadRequest(`Invalid number: ${String(value)}`);
-      return parsed;
-    };
+    if (!filters[FILTER.make]?.length) {
+      throw new BadRequest(`Combination ${index + 1} needs a make`);
+    }
+
+    const derivedLabel = [FILTER.make, FILTER.model, FILTER.variant]
+      .flatMap((name) => filters[name] ?? [])
+      .join(' ');
 
     return {
       id: combo.id || shortId(6),
-      label: combo.label?.trim() || [combo.make, combo.model].filter(Boolean).join(' '),
-      make: combo.make,
-      model: combo.model || undefined,
-      minYear: num(combo.minYear),
-      maxYear: num(combo.maxYear),
-      minEngineLitres: num(combo.minEngineLitres),
-      maxEngineLitres: num(combo.maxEngineLitres),
-      maxMileage: num(combo.maxMileage),
-      minPrice: num(combo.minPrice),
-      maxPrice: num(combo.maxPrice),
-      transmission:
-        combo.transmission === 'Automatic' || combo.transmission === 'Manual'
-          ? combo.transmission
-          : undefined,
-      excludeWriteOffs: Boolean(combo.excludeWriteOffs),
+      label: combo.label?.trim() || derivedLabel || 'Untitled combination',
+      labelIsCustom: Boolean(combo.labelIsCustom),
+      filters,
     };
   });
 }
@@ -92,6 +130,51 @@ app.onError((err, c) => {
 app.get('/api/health', (c) =>
   c.json({ ok: true, motConfigured: isMotConfigured(c.env) }),
 );
+
+/**
+ * Filter options for the editor, proxied from AutoTrader's own facet API and
+ * cached in D1.
+ *
+ * The Make/Model/Variant cascade falls out of this: post the filters chosen so
+ * far and AutoTrader returns the valid children — no make means no models, and
+ * a model unlocks that model's variants.
+ */
+app.post('/api/facets', async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    filters?: unknown;
+    postcode?: string;
+    radius?: number | 'national';
+  };
+
+  const selections = parseFilters(body.filters, 0);
+  const filters: FilterInput[] = Object.entries(selections).map(([filter, selected]) => ({
+    filter,
+    selected,
+  }));
+
+  // A postcode isn't needed for facets, but including it makes the result
+  // counts reflect the area actually being searched.
+  if (body.postcode) {
+    const searchLevel = searchLevelFilters({
+      postcode: body.postcode,
+      radius: body.radius ?? 'national',
+    });
+    const present = new Set(filters.map((f) => f.filter));
+    filters.push(...searchLevel.filter((f) => !present.has(f.filter)));
+  }
+
+  try {
+    const result = await getFacets(c.env.DB, filters, fetchFacets);
+    // Housekeeping on a naturally frequent route; failure here is irrelevant.
+    c.executionCtx.waitUntil(pruneFacetCache(c.env.DB).catch(() => {}));
+    return c.json({ ...result.data, source: result.source, fetchedAt: result.fetchedAt });
+  } catch (err) {
+    return c.json(
+      { error: err instanceof Error ? err.message : 'Could not load filter options' },
+      502,
+    );
+  }
+});
 
 app.get('/api/searches', async (c) => c.json(await db.listSearches(c.env.DB)));
 

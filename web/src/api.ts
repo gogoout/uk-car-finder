@@ -1,6 +1,7 @@
-import type { Combo, ResultListing, SavedSearch } from '../../src/types';
+import type { Combo, FilterSelections, ResultListing, SavedSearch } from '../../src/types';
+import type { FacetData } from '../../src/autotrader/facets';
 
-export type { Combo, ResultListing, SavedSearch };
+export type { Combo, FacetData, FilterSelections, ResultListing, SavedSearch };
 
 export interface RunRow {
   id: number;
@@ -40,6 +41,17 @@ export interface SearchInput {
 }
 
 export const api = {
+  /**
+   * Filter options for the editor. Passing the combo's current filters is what
+   * drives the Make -> Model -> Variant cascade: AutoTrader returns the valid
+   * children of whatever is already chosen.
+   */
+  getFacets: (filters: FilterSelections, postcode: string, radius: number | 'national') =>
+    request<FacetData>('/api/facets', {
+      method: 'POST',
+      body: JSON.stringify({ filters, postcode: postcode || undefined, radius }),
+    }),
+
   listSearches: () => request<SavedSearch[]>('/api/searches'),
 
   createSearch: (input: SearchInput) =>

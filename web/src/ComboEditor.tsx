@@ -1,130 +1,154 @@
-import type { Combo } from './api';
+import { useEffect, useRef, useState } from 'react';
+import { api, type Combo } from './api';
+import { FacetAccordion } from './FacetAccordion';
+import { applyCascade } from '../../src/facetUi';
+import { FILTER } from '../../src/types';
+import type { FacetData } from '../../src/autotrader/facets';
 
 /**
- * One row of the search builder: a single spec combination, e.g.
- * "MINI Cooper, 1.4-1.6L, Auto, 2015+, under 85k, £5.5k-£7k".
+ * One search combination, e.g. "MINI Cooper 1.5 Auto, 2015-16, under 85k,
+ * £5.5-7k".
+ *
+ * Every control is driven by AutoTrader's facet API rather than hardcoded, so
+ * the option lists are always theirs and always current. Changing a filter
+ * refetches, which is what makes Make → Model → Variant cascade and keeps the
+ * result counts honest.
  */
 export function ComboEditor({
   combo,
+  postcode,
+  radius,
   onChange,
   onRemove,
   canRemove,
 }: {
   combo: Combo;
+  postcode: string;
+  radius: number | 'national';
   onChange: (combo: Combo) => void;
   onRemove: () => void;
   canRemove: boolean;
 }) {
-  // Empty inputs must clear the field, not become 0 — a maxPrice of 0 would
-  // silently match nothing.
-  const set = <K extends keyof Combo>(key: K) => (value: Combo[K]) =>
-    onChange({ ...combo, [key]: value });
+  const [facets, setFacets] = useState<FacetData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  // A combo that already has a make is configured, so it opens collapsed —
+  // otherwise editing a saved search means scrolling past 27 groups per combo.
+  // A fresh one opens expanded, because it needs filling in.
+  const [open, setOpen] = useState(!combo.filters.make?.length);
+  // Guards against an earlier, slower response overwriting a newer one.
+  const requestId = useRef(0);
 
-  const num = (key: keyof Combo) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    onChange({ ...combo, [key]: raw === '' ? undefined : Number(raw) });
-  };
+  useEffect(() => {
+    // No point fetching a collapsed panel's options — with several combos that
+    // is several wasted round trips on load.
+    if (!open) return;
 
-  const text = (key: keyof Combo) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    onChange({ ...combo, [key]: raw === '' ? undefined : raw });
+    const id = ++requestId.current;
+    setLoading(true);
+    api
+      .getFacets(combo.filters, postcode, radius)
+      .then((data) => {
+        if (id !== requestId.current) return;
+        setFacets(data);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (id !== requestId.current) return;
+        setError(err instanceof Error ? err.message : 'Could not load filter options');
+      })
+      .finally(() => {
+        if (id === requestId.current) setLoading(false);
+      });
+  }, [combo.filters, postcode, radius, open]);
+
+  const activeFilterCount = Object.keys(combo.filters).length;
+
+  const setFilter = (filter: string, values: string[]) => {
+    const next = { ...combo.filters };
+    if (values.length > 0) next[filter] = values;
+    else delete next[filter];
+
+    // Choosing a make invalidates the model, a model the variant.
+    const cascaded = applyCascade(next, filter);
+
+    onChange({
+      ...combo,
+      filters: cascaded,
+      label: combo.labelIsCustom ? combo.label : deriveLabel(cascaded),
+    });
   };
 
   return (
-    <div className="card stack">
-      <div className="spread">
-        <strong className="small">{combo.label || 'New combination'}</strong>
-        {canRemove && (
-          <button type="button" className="link" onClick={onRemove}>
-            Remove
-          </button>
-        )}
+    <div className={`card combo-card${open ? ' is-open' : ''}`}>
+      <div className="combo-head">
+        <button
+          type="button"
+          className="combo-toggle"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <span aria-hidden="true" className="facet-caret">
+            {open ? '▾' : '▸'}
+          </span>
+          <span className="combo-name">{combo.label || 'New combination'}</span>
+          {!open && activeFilterCount > 0 && (
+            <span className="tiny muted combo-count">
+              {activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'}
+            </span>
+          )}
+        </button>
+
+        <span className="row combo-actions">
+          {open && facets?.resultCount !== null && facets?.resultCount !== undefined && (
+            <span className="badge">{facets.resultCount.toLocaleString('en-GB')} on AutoTrader</span>
+          )}
+          {canRemove && (
+            <button type="button" className="link" onClick={onRemove}>
+              Remove
+            </button>
+          )}
+        </span>
       </div>
 
-      <label>
-        <span>Label (shown on matching cars)</span>
-        <input
-          value={combo.label}
-          placeholder="MINI Cooper 1.5 Auto"
-          onChange={(e) => set('label')(e.target.value)}
-        />
-      </label>
+      {open && (
+        <div className="stack combo-body">
+          <label>
+            <span>Label (shown on matching cars)</span>
+            <input
+              value={combo.label}
+              placeholder="MINI Cooper 1.5 Auto"
+              onChange={(e) =>
+                onChange({ ...combo, label: e.target.value, labelIsCustom: e.target.value !== '' })
+              }
+            />
+          </label>
 
-      <div className="grid-2">
-        <label>
-          <span>Make *</span>
-          <input value={combo.make ?? ''} placeholder="MINI" onChange={text('make')} />
-        </label>
-        <label>
-          <span>Model</span>
-          <input value={combo.model ?? ''} placeholder="Cooper" onChange={text('model')} />
-        </label>
-      </div>
+          {error && (
+            <div className="banner">
+              {error} — filter options are unavailable, but a saved combination still runs.
+            </div>
+          )}
 
-      <div className="grid-2">
-        <label>
-          <span>Year from</span>
-          <input type="number" inputMode="numeric" value={combo.minYear ?? ''} placeholder="2015" onChange={num('minYear')} />
-        </label>
-        <label>
-          <span>Year to</span>
-          <input type="number" inputMode="numeric" value={combo.maxYear ?? ''} placeholder="2016" onChange={num('maxYear')} />
-        </label>
-      </div>
+          {!facets && loading && <div className="tiny muted">Loading filters…</div>}
 
-      <div className="grid-2">
-        <label>
-          <span>Engine from (litres)</span>
-          <input type="number" step="0.1" inputMode="decimal" value={combo.minEngineLitres ?? ''} placeholder="1.4" onChange={num('minEngineLitres')} />
-        </label>
-        <label>
-          <span>Engine to (litres)</span>
-          <input type="number" step="0.1" inputMode="decimal" value={combo.maxEngineLitres ?? ''} placeholder="1.6" onChange={num('maxEngineLitres')} />
-        </label>
-      </div>
-
-      <div className="grid-2">
-        <label>
-          <span>Price from (£)</span>
-          <input type="number" inputMode="numeric" value={combo.minPrice ?? ''} placeholder="5500" onChange={num('minPrice')} />
-        </label>
-        <label>
-          <span>Price to (£)</span>
-          <input type="number" inputMode="numeric" value={combo.maxPrice ?? ''} placeholder="7000" onChange={num('maxPrice')} />
-        </label>
-      </div>
-
-      <div className="grid-2">
-        <label>
-          <span>Max mileage</span>
-          <input type="number" inputMode="numeric" value={combo.maxMileage ?? ''} placeholder="85000" onChange={num('maxMileage')} />
-        </label>
-        <label>
-          <span>Transmission</span>
-          <select
-            value={combo.transmission ?? ''}
-            onChange={(e) =>
-              onChange({
-                ...combo,
-                transmission: e.target.value === '' ? undefined : (e.target.value as Combo['transmission']),
-              })
-            }
-          >
-            <option value="">Any</option>
-            <option value="Automatic">Automatic</option>
-            <option value="Manual">Manual</option>
-          </select>
-        </label>
-      </div>
-
-      <label className="checkbox">
-        <input
-          type="checkbox"
-          checked={Boolean(combo.excludeWriteOffs)}
-          onChange={(e) => set('excludeWriteOffs')(e.target.checked)}
-        />
-        <span style={{ margin: 0 }}>Exclude write-offs (Cat S/N)</span>
-      </label>
+          {facets && (
+            <>
+              {loading && <div className="tiny muted">Updating options…</div>}
+              <FacetAccordion data={facets} selections={combo.filters} onChange={setFilter} />
+            </>
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+/** "MINI Cooper Classic" from the make/model/variant selections. */
+export function deriveLabel(filters: Record<string, string[]>): string {
+  return (
+    [FILTER.make, FILTER.model, FILTER.variant]
+      .flatMap((name) => filters[name] ?? [])
+      .join(' ') || ''
   );
 }

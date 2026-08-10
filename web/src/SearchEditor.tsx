@@ -5,42 +5,48 @@ import { ComboEditor } from './ComboEditor';
 const newCombo = (): Combo => ({
   id: Math.random().toString(36).slice(2, 8),
   label: '',
-  make: '',
+  filters: {},
 });
 
 /**
  * Your worked example, offered as a starting point so the first search is one
- * click rather than twenty fields.
+ * click rather than twenty dropdowns.
  */
 const EXAMPLE_COMBOS: Combo[] = [
   {
     id: 'mini',
     label: 'MINI Cooper 1.5 Auto',
-    make: 'MINI',
-    model: 'Cooper',
-    minYear: 2015,
-    maxYear: 2016,
-    minEngineLitres: 1.4,
-    maxEngineLitres: 1.6,
-    maxMileage: 85000,
-    minPrice: 5500,
-    maxPrice: 7000,
-    transmission: 'Automatic',
-    excludeWriteOffs: true,
+    labelIsCustom: true,
+    filters: {
+      make: ['MINI'],
+      model: ['Cooper'],
+      min_year_manufactured: ['2015'],
+      max_year_manufactured: ['2016'],
+      min_engine_size: ['1.4'],
+      max_engine_size: ['1.6'],
+      max_mileage: ['85000'],
+      min_price: ['5500'],
+      max_price: ['7000'],
+      transmission: ['Automatic'],
+      is_writeoff: ['exclude'],
+    },
   },
   {
     id: 'mazda',
     label: 'Mazda2 1.5 Skyactiv-G Auto',
-    make: 'MAZDA',
-    model: 'Mazda2',
-    minYear: 2015,
-    minEngineLitres: 1.4,
-    maxEngineLitres: 1.6,
-    maxMileage: 80000,
-    minPrice: 6000,
-    maxPrice: 8000,
-    transmission: 'Automatic',
-    excludeWriteOffs: true,
+    labelIsCustom: true,
+    filters: {
+      make: ['MAZDA'],
+      model: ['Mazda2'],
+      min_year_manufactured: ['2015'],
+      min_engine_size: ['1.4'],
+      max_engine_size: ['1.6'],
+      max_mileage: ['80000'],
+      min_price: ['6000'],
+      max_price: ['8000'],
+      transmission: ['Automatic'],
+      is_writeoff: ['exclude'],
+    },
   },
 ];
 
@@ -135,6 +141,8 @@ export function SearchEditor({
         <ComboEditor
           key={combo.id}
           combo={combo}
+          postcode={postcode}
+          radius={radius === 'national' ? 'national' : Number(radius)}
           canRemove={combos.length > 1}
           onChange={(updated) =>
             setCombos(combos.map((c, i) => (i === index ? updated : c)))
@@ -145,10 +153,17 @@ export function SearchEditor({
 
       <div className="row">
         <button onClick={() => setCombos([...combos, newCombo()])}>+ Add combination</button>
-        <button className="primary" onClick={save} disabled={saving || !postcode.trim()}>
+        <button
+          className="primary"
+          onClick={save}
+          disabled={saving || !postcode.trim() || !combos.every((c) => c.filters.make?.length)}
+        >
           {saving ? 'Saving…' : 'Save search'}
         </button>
       </div>
+      {!combos.every((c) => c.filters.make?.length) && (
+        <div className="tiny muted">Every combination needs a make before it can be saved.</div>
+      )}
     </>
   );
 }

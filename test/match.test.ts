@@ -6,16 +6,24 @@ import type { Combo, SearchListing } from '../src/types';
 const combo: Combo = {
   id: 'mazda',
   label: 'Mazda2 1.5 Skyactiv-G Auto',
-  make: 'MAZDA',
-  model: 'Mazda2',
-  minYear: 2015,
-  minEngineLitres: 1.4,
-  maxEngineLitres: 1.6,
-  maxMileage: 80000,
-  minPrice: 6000,
-  maxPrice: 8000,
-  transmission: 'Automatic',
+  filters: {
+    make: ['MAZDA'],
+    model: ['Mazda2'],
+    min_year_manufactured: ['2015'],
+    min_engine_size: ['1.4'],
+    max_engine_size: ['1.6'],
+    max_mileage: ['80000'],
+    min_price: ['6000'],
+    max_price: ['8000'],
+    transmission: ['Automatic'],
+  },
 };
+
+/** Convenience for variants of the combo above. */
+const withFilters = (extra: Record<string, string[]>): Combo => ({
+  ...combo,
+  filters: { ...combo.filters, ...extra },
+});
 
 const listing = (overrides: Partial<SearchListing> = {}): SearchListing => ({
   advertId: '1',
@@ -56,7 +64,7 @@ describe('matchesCombo', () => {
   });
 
   it('rejects a car above the maximum year when one is set', () => {
-    const capped = { ...combo, maxYear: 2016 };
+    const capped = withFilters({ max_year_manufactured: ['2016'] });
     expect(matchesCombo(listing({ year: 2018 }), capped).matches).toBe(false);
   });
 
@@ -71,8 +79,20 @@ describe('matchesCombo', () => {
   });
 
   it('matches a multi-word make against the title', () => {
-    const landRover: Combo = { id: 'lr', label: 'Discovery', make: 'LAND ROVER' };
+    const landRover: Combo = { id: 'lr', label: 'Discovery', filters: { make: ['LAND ROVER'] } };
     expect(matchesCombo(listing({ title: 'Land Rover Discovery' }), landRover).matches).toBe(true);
+  });
+
+  it('accepts a listing matching any make when several are selected', () => {
+    const multi: Combo = { id: 'm', label: 'Small autos', filters: { make: ['MINI', 'MAZDA'] } };
+    expect(matchesCombo(listing({ title: 'Mazda Mazda2' }), multi).matches).toBe(true);
+    expect(matchesCombo(listing({ title: 'MINI Cooper' }), multi).matches).toBe(true);
+    expect(matchesCombo(listing({ title: 'Ford Fiesta' }), multi).matches).toBe(false);
+  });
+
+  it('rejects a car below a minimum mileage when one is set', () => {
+    const floor = withFilters({ min_mileage: ['20000'] });
+    expect(matchesCombo(listing({ mileage: 5000 }), floor).matches).toBe(false);
   });
 
   it('keeps a listing whose price is unknown rather than discarding it', () => {
@@ -81,8 +101,15 @@ describe('matchesCombo', () => {
   });
 
   it('accepts anything when the combo sets no bounds', () => {
-    const open: Combo = { id: 'any', label: 'Any Mazda', make: 'MAZDA' };
+    const open: Combo = { id: 'any', label: 'Any Mazda', filters: { make: ['MAZDA'] } };
     expect(matchesCombo(listing({ price: 40000, year: 2026 }), open).matches).toBe(true);
+  });
+
+  it('ignores filters it cannot evaluate from a search result', () => {
+    // Variant, colour and the like are trusted to AutoTrader — they must not
+    // cause a rejection here, or every result would be discarded.
+    const trimmed = withFilters({ aggregated_trim: ['Sport Nav'], colour: ['Blue'] });
+    expect(matchesCombo(listing(), trimmed).matches).toBe(true);
   });
 });
 
@@ -113,5 +140,39 @@ describe('detailMatchesCombo', () => {
 
   it('keeps a listing whose engine or gearbox could not be read', () => {
     expect(detailMatchesCombo(detail({ engineLitres: null, transmission: null }), combo).matches).toBe(true);
+  });
+
+  it('accepts any of several selected gearboxes', () => {
+    const either = withFilters({ transmission: ['Automatic', 'Manual'] });
+    expect(detailMatchesCombo(detail({ transmission: 'Manual' }), either).matches).toBe(true);
+  });
+
+  it('checks fuel type, body type and doors', () => {
+    const strict = withFilters({
+      fuel_type: ['Petrol'],
+      body_type: ['Hatchback'],
+      doors_values: ['5'],
+    });
+
+    expect(
+      detailMatchesCombo(detail({ fuel: 'Petrol', bodyType: 'Hatchback', doors: 5 }), strict).matches,
+    ).toBe(true);
+    expect(detailMatchesCombo(detail({ fuel: 'Diesel' }), strict).reason).toContain('fuel');
+    expect(detailMatchesCombo(detail({ bodyType: 'Estate' }), strict).reason).toContain('body type');
+    expect(detailMatchesCombo(detail({ doors: 3 }), strict).reason).toContain('doors');
+  });
+
+  it('rejects a confirmed write-off when the combo excludes them', () => {
+    const noWriteOffs = withFilters({ is_writeoff: ['exclude'] });
+
+    expect(detailMatchesCombo(detail({ writeOff: 'FAILED' }), noWriteOffs).matches).toBe(false);
+    expect(detailMatchesCombo(detail({ writeOff: 'PASSED' }), noWriteOffs).matches).toBe(true);
+    // UNKNOWN means AutoTrader published no check — not a positive result.
+    expect(detailMatchesCombo(detail({ writeOff: 'UNKNOWN' }), noWriteOffs).matches).toBe(true);
+  });
+
+  it('does not check variant, which only exists as free text in the subtitle', () => {
+    const withVariant = withFilters({ aggregated_trim: ['Sport Nav'] });
+    expect(detailMatchesCombo(detail({ engineLitres: 1.5 }), withVariant).matches).toBe(true);
   });
 });

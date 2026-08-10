@@ -1,12 +1,15 @@
 /**
- * Translates a Combo into AutoTrader's `FilterInput[]`.
+ * Turns a Combo into AutoTrader's `FilterInput[]`.
  *
- * Filter names come from their SPA bundle (`/search-results-app/bundles/main-*.js`),
- * where a `FilterName` enum maps to URL params. `filter` values are an enum on
- * their side, so an unknown name is a hard error rather than a silent no-op.
+ * Since a Combo now stores selections keyed by AutoTrader's own filter names,
+ * this is almost a straight pass-through. The only additions are the
+ * search-level values that describe the searcher rather than the car.
+ *
+ * `filter` is an enum on their side, so an unknown name is a hard 400 rather
+ * than a silently ignored filter — and the error body names the offender.
  */
 
-import type { Combo } from '../types';
+import { FILTER, type Combo } from '../types';
 
 export interface FilterInput {
   filter: string;
@@ -18,42 +21,33 @@ export interface BuildFiltersOptions {
   radius: number | 'national';
 }
 
-export function buildFilters(combo: Combo, opts: BuildFiltersOptions): FilterInput[] {
+/** Search-level filters, which live on the saved search rather than the combo. */
+export function searchLevelFilters(opts: BuildFiltersOptions): FilterInput[] {
   const filters: FilterInput[] = [
-    { filter: 'postcode', selected: [opts.postcode] },
+    { filter: FILTER.postcode, selected: [opts.postcode] },
     // 'total' means the sticker price rather than a monthly finance figure.
-    { filter: 'price_search_type', selected: ['total'] },
+    { filter: FILTER.priceSearchType, selected: ['total'] },
   ];
 
   // Their URL param is `radius`, but the gateway enum calls it `distance`.
   if (opts.radius !== 'national') {
-    filters.push({ filter: 'distance', selected: [String(opts.radius)] });
-  }
-
-  const add = (filter: string, value: string | number | undefined | null) => {
-    if (value === undefined || value === null || value === '') return;
-    filters.push({ filter, selected: [String(value)] });
-  };
-
-  add('make', combo.make);
-  add('model', combo.model);
-  add('min_year_manufactured', combo.minYear);
-  add('max_year_manufactured', combo.maxYear);
-  add('min_engine_size', combo.minEngineLitres);
-  add('max_engine_size', combo.maxEngineLitres);
-  add('max_mileage', combo.maxMileage);
-  add('min_price', combo.minPrice);
-  add('max_price', combo.maxPrice);
-  add('transmission', combo.transmission);
-
-  // Server-side write-off exclusion. The converter only accepts 'false' — 'true'
-  // and 'on' are rejected by their backend. This narrows the result set but is
-  // not the last word: the per-listing WRITE_OFF check in normalise.ts is what
-  // actually confirms a specific car, since it distinguishes "cleared" from
-  // "no check published".
-  if (combo.excludeWriteOffs) {
-    filters.push({ filter: 'is_writeoff', selected: ['false'] });
+    filters.push({ filter: FILTER.distance, selected: [String(opts.radius)] });
   }
 
   return filters;
+}
+
+export function buildFilters(combo: Combo, opts: BuildFiltersOptions): FilterInput[] {
+  const comboFilters = Object.entries(combo.filters)
+    // An empty selection means "no preference", which is the absence of the
+    // filter — sending an empty array would be rejected.
+    .filter(([, selected]) => selected.length > 0)
+    .map(([filter, selected]) => ({ filter, selected }));
+
+  // Combo values win: a combo that sets its own distance overrides the search's.
+  const comboNames = new Set(comboFilters.map((f) => f.filter));
+  return [
+    ...searchLevelFilters(opts).filter((f) => !comboNames.has(f.filter)),
+    ...comboFilters,
+  ];
 }
