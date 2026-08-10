@@ -17,7 +17,8 @@
     "test:unit": "vitest run",
     "test:integration": "vitest run -c vitest.workers.config.ts",
     "predev": "pnpm run build",
-    "capture:fixture": "tsx scripts/capture-fixture.ts"
+    "capture:fixture": "tsx scripts/capture-fixture.ts",
+    "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
     "hono": "^4.13.1"

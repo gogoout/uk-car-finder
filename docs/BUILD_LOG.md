@@ -69,6 +69,23 @@ checked against the title, comparing with punctuation and case stripped — the
 facet says "C-Class" where a title says "C Class". Read-time verification meant
 it disappeared without a refresh; a fresh run now rejects 4 rather than 2.
 
+### Follow-up: why a search wouldn't save
+
+Reported as "the test scenario can't be saved". Reproduced in the browser: the
+combination was fine — make selected, label derived — but **Save was greyed out
+because the postcode was empty, and nothing said so.** The only hint covered a
+missing make. Checked whether the requirement was self-imposed: it isn't, the
+search gateway rejects a request without one ("postcode - A required filter").
+
+The disabled button now names exactly what is missing, and which combination it
+is missing from.
+
+The "Use MINI + Mazda2 example" button is gone. It existed to seed a test
+scenario, which a script does better: `pnpm run seed [--refresh] [--url ...]`.
+It posts through the API rather than writing to D1, so it exercises the same
+validation the browser does, works against a deployed Worker, and can't hit the
+SQLITE_BUSY that touching the local database while wrangler holds it causes.
+
 ### Process note
 
 `pnpm run typecheck | tail -2 && echo OK` reported success while tsc was
