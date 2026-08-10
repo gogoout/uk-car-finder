@@ -175,10 +175,15 @@ describe('results and deltas', () => {
   });
 
   it('tags a listing with every combo that matched it', async () => {
+    // Both combos must belong to the search — refreshSearch only ever links
+    // combos it is iterating over, and credits are verified against them.
+    const second = combo({}, { id: 'c2', label: 'Any small auto' });
+    await db.upsertSearch(DB, savedSearch({ combos: [combo(), second] }));
+
     const runId = await db.startRun(DB, 's1');
     await db.upsertSearchListing(DB, searchListing());
     await db.linkListingToCombo(DB, 's1', '1', combo(), runId);
-    await db.linkListingToCombo(DB, 's1', '1', combo({}, { id: 'c2', label: 'Any small auto' }), runId);
+    await db.linkListingToCombo(DB, 's1', '1', second, runId);
     await db.finishRun(DB, runId, { pagesFetched: 1, listingsSeen: 1, newCount: 1, priceDropCount: 0 });
 
     const [result] = await db.getResults(DB, 's1');
@@ -203,6 +208,96 @@ describe('results and deltas', () => {
     await seedRun([{ advertId: '1' }]);
 
     expect(await db.getResults(DB, 's2')).toHaveLength(0);
+  });
+
+  /**
+   * Links are written when a listing matches, but nothing re-evaluates them
+   * afterwards. Narrowing a combo means AutoTrader simply stops returning that
+   * car, so its link is never touched and it lingers in the results.
+   */
+  describe('after the combo is edited', () => {
+    it('drops a listing that no longer satisfies a narrowed price range', async () => {
+      await db.upsertSearch(
+        DB,
+        savedSearch({ combos: [combo({ max_price: ['8000'] })] }),
+      );
+      await seedRun([{ advertId: 'cheap', price: 6500 }, { advertId: 'dear', price: 7800 }]);
+      expect(await db.getResults(DB, 's1')).toHaveLength(2);
+
+      // The user lowers the cap to £7,000.
+      await db.upsertSearch(DB, savedSearch({ combos: [combo({ max_price: ['7000'] })] }));
+
+      const results = await db.getResults(DB, 's1');
+      expect(results.map((r) => r.advertId)).toEqual(['cheap']);
+    });
+
+    it('drops a listing outside a narrowed year or mileage bound', async () => {
+      await db.upsertSearch(DB, savedSearch({ combos: [combo()] }));
+      await seedRun([
+        { advertId: 'ok', year: 2016, mileage: 40000 },
+        { advertId: 'old', year: 2012, mileage: 40000 },
+        { advertId: 'worn', year: 2016, mileage: 120000 },
+      ]);
+
+      await db.upsertSearch(
+        DB,
+        savedSearch({
+          combos: [combo({ min_year_manufactured: ['2015'], max_mileage: ['85000'] })],
+        }),
+      );
+
+      expect((await db.getResults(DB, 's1')).map((r) => r.advertId)).toEqual(['ok']);
+    });
+
+    it('stops crediting a combo that no longer matches, without hiding the listing', async () => {
+      await db.upsertSearch(
+        DB,
+        savedSearch({
+          combos: [combo({}, { id: 'c1', label: 'Cheap' }), combo({}, { id: 'c2', label: 'Any' })],
+        }),
+      );
+      const runId = await db.startRun(DB, 's1');
+      await db.upsertSearchListing(DB, searchListing({ advertId: '1', price: 7500 }));
+      await db.linkListingToCombo(DB, 's1', '1', combo({}, { id: 'c1', label: 'Cheap' }), runId);
+      await db.linkListingToCombo(DB, 's1', '1', combo({}, { id: 'c2', label: 'Any' }), runId);
+      await db.finishRun(DB, runId, {
+        pagesFetched: 1, listingsSeen: 1, newCount: 1, priceDropCount: 0,
+      });
+
+      // Only the first combo gains a cap the listing fails.
+      await db.upsertSearch(
+        DB,
+        savedSearch({
+          combos: [
+            combo({ max_price: ['7000'] }, { id: 'c1', label: 'Cheap' }),
+            combo({}, { id: 'c2', label: 'Any' }),
+          ],
+        }),
+      );
+
+      const [result] = await db.getResults(DB, 's1');
+      expect(result!.matchedCombos).toEqual(['Any']);
+    });
+
+    it('keeps a listing when the combo is widened', async () => {
+      await db.upsertSearch(DB, savedSearch({ combos: [combo({ max_price: ['7000'] })] }));
+      await seedRun([{ advertId: '1', price: 6500 }]);
+
+      await db.upsertSearch(DB, savedSearch({ combos: [combo({ max_price: ['9000'] })] }));
+
+      expect(await db.getResults(DB, 's1')).toHaveLength(1);
+    });
+
+    it('keeps a listing whose combo was deleted from the search entirely', async () => {
+      // Nothing should vanish just because a combo was removed while the
+      // listing is still linked — it simply loses that credit.
+      await db.upsertSearch(DB, savedSearch({ combos: [combo()] }));
+      await seedRun([{ advertId: '1', price: 6500 }]);
+
+      await db.upsertSearch(DB, savedSearch({ combos: [combo({}, { id: 'other' })] }));
+
+      expect(await db.getResults(DB, 's1')).toHaveLength(0);
+    });
   });
 });
 

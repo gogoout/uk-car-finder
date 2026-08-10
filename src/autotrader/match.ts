@@ -24,6 +24,7 @@ import {
   filterValues,
   type Combo,
   type ListingDetail,
+  type ResultListing,
   type SearchListing,
 } from '../types';
 
@@ -148,4 +149,67 @@ export function detailMatchesCombo(detail: ListingDetail, combo: Combo): MatchRe
   }
 
   return MATCH;
+}
+
+/**
+ * Re-checks an already-stored listing against a combo's *current* filters.
+ *
+ * Links are written when a listing matches and are never revisited, so
+ * narrowing a combo used to leave the excluded cars on screen: AutoTrader
+ * simply stops returning them, and nothing removes the existing link. Results
+ * are therefore verified at read time, against the combo as it stands now.
+ *
+ * Runs the same two matchers as the ingest path so there is one definition of
+ * "matches" rather than a second, drifting copy. Detail-derived fields are null
+ * until enrichment, and nulls pass, so an un-enriched listing is judged on its
+ * search fields alone — exactly as it was on the way in.
+ */
+export function storedListingMatches(listing: ResultListing, combo: Combo): MatchResult {
+  const asSearchListing: SearchListing = {
+    advertId: listing.advertId,
+    title: listing.title,
+    subTitle: listing.subTitle,
+    attentionGrabber: null,
+    price: listing.price,
+    mileage: listing.mileage,
+    year: listing.year,
+    plateReg: listing.plateReg,
+    priceIndicator: listing.priceIndicator,
+    sellerType: listing.sellerType,
+    detailPath: '',
+    imageCount: null,
+  };
+
+  const searchResult = matchesCombo(asSearchListing, combo);
+  if (!searchResult.matches) return searchResult;
+
+  const asDetail: ListingDetail = {
+    advertId: listing.advertId,
+    make: listing.make,
+    model: listing.model,
+    year: listing.year,
+    price: listing.price,
+    mileage: listing.mileage,
+    plateReg: listing.plateReg,
+    engineLitres: listing.engineLitres,
+    transmission: listing.transmission,
+    fuel: listing.fuel,
+    bodyType: listing.bodyType,
+    doors: listing.doors,
+    priceIndicator: listing.priceIndicator ?? 'NOANALYSIS',
+    serviceHistory: listing.serviceHistory ?? 'UNKNOWN',
+    lastServiceDate: listing.lastServiceDate,
+    writeOff: listing.writeOff ?? 'UNKNOWN',
+    stolen: listing.stolen ?? 'UNKNOWN',
+    scrapped: listing.scrapped ?? 'UNKNOWN',
+    imported: listing.imported ?? 'UNKNOWN',
+    motStatus: listing.motStatus,
+    sellerName: listing.sellerName,
+    sellerType: listing.sellerType,
+    location: listing.location,
+    imageUrl: listing.imageUrl,
+    vrm: listing.vrm,
+  };
+
+  return detailMatchesCombo(asDetail, combo);
 }

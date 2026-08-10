@@ -88,6 +88,32 @@ so editing a saved search stays scannable — while a fresh one opens expanded
 because it needs filling in. Collapsed panels also skip their facet fetch, which
 removes a round trip per combination on load.
 
+### Follow-up: narrowing a filter didn't remove excluded cars
+
+Reported: reducing a combo's price range left the dearer cars on screen.
+
+Root cause, not the symptom: a row in `search_listings` is written when a
+listing matches and is **never re-evaluated**. The only deletions were dropping
+a whole search, and `drain.ts` unlinking when a detail page contradicts a combo.
+So lowering `max_price` meant AutoTrader simply stopped returning that car — and
+with nothing touching its existing link, `getResults` kept serving it. The same
+hole meant a listing could keep crediting a combo it no longer satisfied.
+
+Fixed by enforcing the missing invariant at read time: every credit is re-checked
+against the combo *as it stands now*, via `storedListingMatches()` — which reuses
+the same two matchers as the ingest path, so there is one definition of "matches"
+rather than a second copy that drifts. Credits that no longer hold are dropped;
+a listing left with none disappears. This also means an edit takes effect
+immediately rather than after the next 4-hourly run.
+
+Reproduced live before fixing: a Mazda2 combo capped at £12,000 returned 35 cars;
+lowering the cap to £7,000 left all 35 on screen. After the fix, 6, none above
+the cap, with no refresh.
+
+One existing test had to change: it linked a combo that was not in the saved
+search, which `refreshSearch` would never do. Its setup was wrong, not the new
+assertion.
+
 ### Self-inflicted note
 
 Running `wrangler d1 execute --local` while `wrangler dev` was up killed workerd
