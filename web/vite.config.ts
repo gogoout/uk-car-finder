@@ -9,7 +9,22 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    // `npm run dev:web` proxies API calls to `wrangler dev`.
-    proxy: { '/api': 'http://localhost:8787' },
+    proxy: {
+      // This dev server only renders the SPA. The API and D1 live in the
+      // Worker, so `pnpm run dev` has to be running in another terminal.
+      '/api': {
+        target: 'http://localhost:8787',
+        configure(proxy) {
+          proxy.on('error', (err) => {
+            if ((err as NodeJS.ErrnoException).code === 'ECONNREFUSED') {
+              console.error(
+                '\n  No Worker on :8787 — the API is served by wrangler, not by Vite.' +
+                  '\n  Run `pnpm run dev` in another terminal, then reload.\n',
+              );
+            }
+          });
+        },
+      },
+    },
   },
 });

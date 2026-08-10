@@ -35,11 +35,29 @@ needed, and no auth code in the app.
 
 ### Local development
 
+One-off, to create the local database:
+
 ```bash
 pnpm run db:local     # apply the schema to a local D1
-pnpm run dev          # worker + built SPA on :8787
-pnpm run dev:web      # optional: Vite dev server with HMR, proxying /api to :8787
 ```
+
+Then, for everyday use, one terminal is enough:
+
+```bash
+pnpm run dev          # Worker + API + SPA on http://localhost:8787
+```
+
+That rebuilds the SPA first and serves it from the Worker, so it's the whole app.
+The SPA won't hot-reload, so if you're iterating on the UI, add a **second**
+terminal:
+
+```bash
+pnpm run dev:web      # Vite with HMR, on the port it prints
+```
+
+Vite only renders the SPA — `/api` is proxied to the Worker, so `pnpm run dev`
+must already be running. If it isn't, you'll get
+`ECONNREFUSED 127.0.0.1:8787`; start the Worker and reload.
 
 Trigger the cron by hand:
 

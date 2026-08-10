@@ -15,7 +15,8 @@
     "db:local": "wrangler d1 execute uk-car-finder --local --file=./migrations/0001_init.sql",
     "db:remote": "wrangler d1 execute uk-car-finder --remote --file=./migrations/0001_init.sql",
     "test:unit": "vitest run",
-    "test:integration": "vitest run -c vitest.workers.config.ts"
+    "test:integration": "vitest run -c vitest.workers.config.ts",
+    "predev": "pnpm run build"
   },
   "dependencies": {
     "hono": "^4.13.1"

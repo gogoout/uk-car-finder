@@ -5,6 +5,24 @@ discovered about AutoTrader that aren't obvious from the code. Newest first.
 
 ---
 
+## 2026-08-10 — Fix two dev-server papercuts
+
+Running `pnpm run dev:web` on its own gave `ECONNREFUSED 127.0.0.1:8787`. Vite
+serves only the SPA; the API and D1 live in the Worker, so `pnpm run dev` has to
+be running too. Two fixes so this doesn't have to be learned the hard way:
+
+- The Vite proxy now catches `ECONNREFUSED` and prints what to actually do,
+  instead of a bare stack trace.
+- `predev` builds the SPA before `wrangler dev` starts. `web/dist` is gitignored,
+  so on a fresh clone the Worker failed outright with *"The directory specified by
+  the assets.directory field does not exist"* — verified by deleting the
+  directory and watching it fail. Now `pnpm run dev` works from a clean checkout.
+
+README rewritten to say plainly that one terminal is enough for normal use, and
+the second is only for SPA hot-reload.
+
+---
+
 ## 2026-08-10 — Switch to pnpm
 
 Project scaffolded with npm; converted at request. `packageManager` is now
