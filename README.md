@@ -123,5 +123,7 @@ AutoTrader along the way.
 - Their schema is undocumented and can change without notice. `pnpm run smoke` is
   how you find out.
 - No credentials are needed to search, and none are stored.
-- Test fixtures are real, publicly-listed AutoTrader adverts, kept because they
-  cover the parsing edge cases that matter.
+- Test fixtures are real AutoTrader adverts, trimmed to just the embedded data
+  payload the parser reads. Capture new ones with
+  `pnpm run capture:fixture <advertId> [suffix]` — never commit a whole page,
+  which carries AutoTrader's own third-party API keys.

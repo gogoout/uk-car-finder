@@ -16,7 +16,8 @@
     "db:remote": "wrangler d1 execute uk-car-finder --remote --file=./migrations/0001_init.sql",
     "test:unit": "vitest run",
     "test:integration": "vitest run -c vitest.workers.config.ts",
-    "predev": "pnpm run build"
+    "predev": "pnpm run build",
+    "capture:fixture": "tsx scripts/capture-fixture.ts"
   },
   "dependencies": {
     "hono": "^4.13.1"

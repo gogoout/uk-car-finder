@@ -5,6 +5,31 @@ discovered about AutoTrader that aren't obvious from the code. Newest first.
 
 ---
 
+## 2026-08-10 — Trim fixtures after a secret-scanning alert
+
+GitHub flagged a leaked Google API key in the fixtures. It is AutoTrader's own
+`googleMapsApiKey`, embedded in the `AT_SPA_JS_CONFIG` script that ships to every
+visitor of autotrader.co.uk — not ours, already public, and nothing to rotate.
+But committing whole pages republished it, which is both bad form and permanent
+alert noise. My fault: I committed 200KB pages when the parser reads one script.
+
+Fixtures are now trimmed to the `__staticRouterHydrationData` payload alone —
+806KB down to 233KB, with the config script, adverts and trackers gone. The key
+was never inside the hydration blob, so no test data changed and all 72 tests
+still pass. Existing fixtures were transformed offline rather than re-fetched:
+re-capturing would have lost the edge cases they were chosen for, since those
+adverts sell.
+
+Two changes so it can't recur:
+
+- `scripts/capture-fixture.ts` captures new fixtures trimmed by construction and
+  refuses to write anything containing a key-like string.
+- `test/fixtures.test.ts` asserts every fixture has exactly one script tag, no
+  key-shaped strings, no `AT_SPA_JS_CONFIG`, and is still parseable. Verified by
+  reintroducing the key and watching the tests fail.
+
+---
+
 ## 2026-08-10 — Fix two dev-server papercuts
 
 Running `pnpm run dev:web` on its own gave `ECONNREFUSED 127.0.0.1:8787`. Vite
