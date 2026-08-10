@@ -48,6 +48,11 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Holds the Cloudflare secrets. Naming it here is what grants this job
+    # access to them — `verify` and `smoke` cannot read them at all. Add a
+    # deployment branch rule limiting the environment to `main` and GitHub
+    # enforces it independently of the `if:` above.
+    environment: production
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -70,8 +75,8 @@ jobs:
           [ -n "$CLOUDFLARE_API_TOKEN" ] || missing="$missing CLOUDFLARE_API_TOKEN"
           [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || missing="$missing CLOUDFLARE_ACCOUNT_ID"
           if [ -n "$missing" ]; then
-            echo "::error::Missing repository secret(s):$missing"
-            echo "Add them under Settings -> Secrets and variables -> Actions."
+            echo "::error::Missing environment secret(s):$missing"
+            echo "Add them under Settings -> Environments -> production -> Environment secrets."
             echo "Use an account-owned token (Manage Account -> Account API Tokens)"
             echo "with Workers Scripts:Edit and D1:Edit. The account id must be set too:"
             echo "it is what stops wrangler attempting a membership lookup those tokens cannot grant."
