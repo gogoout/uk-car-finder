@@ -5,6 +5,43 @@ discovered about AutoTrader that aren't obvious from the code. Newest first.
 
 ---
 
+## 2026-08-11 — Continuous deployment, and a binding rename that would have broken production
+
+`.github/workflows/ci.yml`: `verify` on every PR and push, `deploy` on `main`
+only, `smoke` after a successful deploy.
+
+- **Migrations apply before the deploy**, so new code never meets an old schema.
+  `wrangler d1 migrations apply` skips its confirmation prompt automatically
+  when not attached to a terminal, so CI needs no extra flag — its `--help` says
+  so, rather than this being assumed.
+- **wrangler is called directly**, not through `cloudflare/wrangler-action`.
+  The lockfile already pins the version the tests ran against, so this avoids
+  version drift and keeps a third-party action out of the path of a token that
+  can deploy code.
+- **The smoke test is its own job.** It hits AutoTrader for real, so a failure
+  means their schema moved or the market is empty — not that the deploy broke,
+  which by then has already succeeded.
+- Two guard steps fail with plain messages if `database_id` is still
+  `REPLACE_ME` or the secrets are missing, instead of an opaque wrangler error.
+
+### The find
+
+While testing the `REPLACE_ME` guard, it passed when it should have failed —
+because the working tree already had a real database id. Reading the diff:
+`wrangler d1 create` had rewritten `wrangler.jsonc` and **renamed the D1 binding
+from `DB` to `uk_car_finder`**.
+
+`src/index.ts` declares `DB: D1Database` and there are 19 uses of `env.DB` in
+`src/` alone. With that rename, `wrangler deploy` still succeeds and every
+single API request then throws on an undefined binding — the worst shape of
+failure, silent at deploy and total at runtime.
+
+Binding restored to `DB`, verified with `wrangler deploy --dry-run`
+(`env.DB (uk-car-finder)`), and a comment added to the config saying why it must
+stay that way, since `wrangler d1 create` will try to rename it again.
+
+---
+
 ## 2026-08-10 — Detail modal with the full photo gallery
 
 The result cards showed one thumbnail and a link out to AutoTrader. Now tapping

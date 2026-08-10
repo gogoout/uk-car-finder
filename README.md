@@ -40,9 +40,36 @@ pnpm exec wrangler d1 migrations apply uk-car-finder --remote
 pnpm run deploy
 ```
 
+> `wrangler d1 create` rewrites `wrangler.jsonc` and renames the D1 binding to
+> match the database. Keep it as `DB` — that is what `src/index.ts` reads. A
+> renamed binding still deploys cleanly and then fails on every request.
+
 Then protect it: in the Cloudflare dashboard go to your Worker →
 **Settings → Domains & Routes → Enable Cloudflare Access**. No custom domain
 needed, and no auth code in the app.
+
+### Continuous deployment
+
+`.github/workflows/ci.yml` typechecks, tests and builds every pull request, and
+on a merge to `main` applies D1 migrations and deploys, then smoke-tests the
+live site.
+
+Two secrets are needed. Put them on a **`production` environment**
+(Settings → Environments → New environment → `production`), not on the
+repository — environment secrets are readable only by a job that names that
+environment, so the `verify` and `smoke` jobs cannot touch them at all. Add a
+deployment branch rule limiting the environment to `main` and GitHub enforces
+that independently of the workflow's own condition. Environments and their
+protection rules are free for public repositories.
+
+| Secret | Notes |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | An **account-owned** token (Manage Account → Account API Tokens), with **Workers Scripts:Edit** and **D1:Edit**. The stock "Edit Cloudflare Workers" template alone can't apply migrations. A user token works too, but an account-owned one isn't tied to a person. |
+| `CLOUDFLARE_ACCOUNT_ID` | From the dashboard sidebar. Required — supplying it is what lets an account-owned token work, since wrangler otherwise tries a membership lookup that account tokens cannot grant. |
+
+`database_id` in `wrangler.jsonc` is committed deliberately — it identifies the
+database but grants nothing without the API token. DVSA secrets are set with
+`wrangler secret put` and live on the Worker; deploying does not clear them.
 
 ### Local development
 
