@@ -40,9 +40,30 @@ pnpm exec wrangler d1 migrations apply uk-car-finder --remote
 pnpm run deploy
 ```
 
+> `wrangler d1 create` rewrites `wrangler.jsonc` and renames the D1 binding to
+> match the database. Keep it as `DB` — that is what `src/index.ts` reads. A
+> renamed binding still deploys cleanly and then fails on every request.
+
 Then protect it: in the Cloudflare dashboard go to your Worker →
 **Settings → Domains & Routes → Enable Cloudflare Access**. No custom domain
 needed, and no auth code in the app.
+
+### Continuous deployment
+
+`.github/workflows/ci.yml` typechecks, tests and builds every pull request, and
+on a merge to `main` applies D1 migrations and deploys, then smoke-tests the
+live site.
+
+Two repository secrets are needed (Settings → Secrets and variables → Actions):
+
+| Secret | Notes |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | Scope to this account only, with **Workers Scripts:Edit** and **D1:Edit**. The stock "Edit Cloudflare Workers" template alone can't apply migrations. |
+| `CLOUDFLARE_ACCOUNT_ID` | From the Cloudflare dashboard sidebar. |
+
+`database_id` in `wrangler.jsonc` is committed deliberately — it identifies the
+database but grants nothing without the API token. DVSA secrets are set with
+`wrangler secret put` and live on the Worker; deploying does not clear them.
 
 ### Local development
 

@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # Lets you redeploy without an empty commit.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Supersede a PR's in-flight run, but never interrupt a deploy midway.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    name: Typecheck, test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the version from package.json's `packageManager` field.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run typecheck
+
+      # Unit + integration. Entirely offline, against committed fixtures — the
+      # live smoke test runs after deploy instead.
+      - run: pnpm test
+
+      - run: pnpm run build
+
+  deploy:
+    name: Deploy to Cloudflare
+    needs: verify
+    # Never from a pull request, including one from a fork.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the D1 database id has been filled in
+        # Otherwise wrangler fails further along with something much less
+        # obvious than the actual cause.
+        run: |
+          if grep -q '"database_id": *"REPLACE_ME"' wrangler.jsonc; then
+            echo "::error file=wrangler.jsonc::database_id is still REPLACE_ME."
+            echo "Run 'pnpm exec wrangler d1 create uk-car-finder' and paste the id into wrangler.jsonc."
+            exit 1
+          fi
+
+      - name: Check the Cloudflare secrets are set
+        run: |
+          missing=""
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || missing="$missing CLOUDFLARE_API_TOKEN"
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || missing="$missing CLOUDFLARE_ACCOUNT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
+            echo "Add them under Settings -> Secrets and variables -> Actions."
+            echo "The API token needs Workers Scripts:Edit and D1:Edit."
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # web/dist is gitignored, so the Worker's assets have to be built here.
+      - run: pnpm run build
+
+      # Before the deploy, so new code never meets an old schema. Wrangler takes
+      # a backup first and rolls back a migration that fails, and it skips its
+      # confirmation prompt automatically when not attached to a terminal.
+      - name: Apply D1 migrations
+        run: pnpm exec wrangler d1 migrations apply uk-car-finder --remote
+
+      # Calling wrangler directly rather than via cloudflare/wrangler-action:
+      # this uses the exact version pinned in the lockfile and tested above, and
+      # keeps a third-party action out of the path of a deploy-capable token.
+      - name: Deploy Worker
+        run: pnpm exec wrangler deploy
+
+  smoke:
+    name: Smoke test the live site
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Hits AutoTrader for real, which is the only way to detect them changing
+      # their schema. Deliberately its own job: a failure here means their API
+      # moved or the market is empty, not that the deploy went wrong — which has
+      # already succeeded by this point.
+      - run: pnpm run smoke

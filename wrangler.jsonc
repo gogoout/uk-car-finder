@@ -1,37 +1,36 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "uk-car-finder",
-  "main": "src/index.ts",
-  "compatibility_date": "2025-01-15",
-  "compatibility_flags": ["nodejs_compat"],
-
-  "assets": {
-    "directory": "./web/dist",
-    "binding": "ASSETS",
-    "not_found_handling": "single-page-application"
-  },
-
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "uk-car-finder",
-      // Replaced by the real id from `wrangler d1 create uk-car-finder`.
-      "database_id": "REPLACE_ME",
-      "migrations_dir": "migrations"
-    }
-  ],
-
-  "triggers": {
-    "crons": [
-      // Refresh every saved search.
-      "0 */4 * * *",
-      // Drain the detail-fetch queue (free plan allows only 50 subrequests
-      // per invocation, so detail pages are fetched in small batches).
-      "*/15 * * * *"
-    ]
-  },
-
-  "observability": {
-    "enabled": true
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "uk-car-finder",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-01-15",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"assets": {
+		"directory": "./web/dist",
+		"binding": "ASSETS",
+		"not_found_handling": "single-page-application"
+	},
+	// The binding is DB, not the database name — `wrangler d1 create`
+	// rewrites this file and will try to rename it. src/index.ts reads env.DB.
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "uk-car-finder",
+			"database_id": "e9c91e3d-8244-4a34-931a-ef6e0aee5d23",
+			"migrations_dir": "migrations"
+		}
+	],
+	"triggers": {
+		"crons": [
+			// Refresh every saved search.
+			"0 */4 * * *",
+			// Drain the detail-fetch queue (free plan allows only 50 subrequests
+			// per invocation, so detail pages are fetched in small batches).
+			"*/15 * * * *"
+		]
+	},
+	"observability": {
+		"enabled": true
+	}
 }
