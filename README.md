@@ -51,8 +51,11 @@ needed, and no auth code in the app.
 ### Continuous deployment
 
 `.github/workflows/ci.yml` typechecks, tests and builds every pull request, and
-on a merge to `main` applies D1 migrations and deploys, then smoke-tests the
-live site.
+on a merge to `main` applies D1 migrations and deploys.
+
+`pnpm run smoke` is deliberately not part of CI: AutoTrader returns 403 to
+GitHub Actions' shared IP ranges, so it would fail on every deploy regardless of
+your code. Run it locally when you suspect their schema has drifted.
 
 Two secrets are needed. Put them on a **`production` environment**
 (Settings → Environments → New environment → `production`), not on the
@@ -137,7 +140,7 @@ everything else works normally.
 | Command | What it does |
 |---|---|
 | `pnpm test` | Unit tests + D1/cron tests in real workerd |
-| `pnpm run smoke` | Live check against AutoTrader — detects schema drift |
+| `pnpm run smoke` | Live check against AutoTrader — detects schema drift. Local only; AutoTrader 403s GitHub's IPs |
 | `pnpm run typecheck` | Worker and SPA |
 | `pnpm run build` | Build the SPA into `web/dist` |
 | `pnpm run capture:fixture <id>` | Capture a trimmed test fixture from a live advert |

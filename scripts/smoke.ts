@@ -7,6 +7,11 @@
  * Schema drift is this project's main long-term failure mode: the gateway
  * returns a GraphQL error naming the offending field, which this surfaces
  * verbatim so the query in src/autotrader/search.ts can be corrected.
+ *
+ * Deliberately NOT run in CI. It was tried as a post-deploy job and AutoTrader
+ * returned HTTP 403 on the first request: they block GitHub Actions' shared IP
+ * ranges. The identical commit passes from a laptop, so a CI job would fail on
+ * every deploy while telling you nothing about your code.
  */
 
 import { buildFilters } from '../src/autotrader/filters';
