@@ -220,6 +220,7 @@ describe('drainDetailQueue', () => {
       sellerType: null,
       detailPath: '/car-details/good',
       imageCount: null,
+      imageUrl: null,
     });
 
     const fetchImpl = vi.fn().mockImplementation((url: string) =>

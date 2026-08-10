@@ -127,8 +127,8 @@ export async function upsertSearchListing(
       `INSERT INTO listings (
          advert_id, title, sub_title, attention_grabber, detail_path,
          price, mileage, year, plate_reg, price_indicator, seller_type,
-         image_count, first_seen_at, last_seen_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         image_count, image_url, first_seen_at, last_seen_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(advert_id) DO UPDATE SET
          title = excluded.title,
          sub_title = excluded.sub_title,
@@ -136,6 +136,9 @@ export async function upsertSearchListing(
          price = excluded.price,
          mileage = excluded.mileage,
          image_count = excluded.image_count,
+         -- Keeps the cover photo current, and gives brand-new listings one
+         -- immediately instead of waiting for the detail queue.
+         image_url = COALESCE(excluded.image_url, listings.image_url),
          -- Search badges are the freshest price-indicator source we have.
          price_indicator = COALESCE(excluded.price_indicator, listings.price_indicator),
          last_seen_at = excluded.last_seen_at`,
@@ -153,6 +156,7 @@ export async function upsertSearchListing(
       listing.priceIndicator,
       listing.sellerType,
       listing.imageCount,
+      listing.imageUrl,
       seenAt,
       seenAt,
     )
@@ -202,7 +206,8 @@ export async function applyDetail(
          make = ?, model = ?, engine_litres = ?, transmission = ?, fuel = ?,
          body_type = ?, doors = ?, service_history = ?, last_service_date = ?,
          write_off = ?, stolen = ?, scrapped = ?, imported = ?, mot_status = ?,
-         seller_name = ?, location = ?, image_url = ?,
+         seller_name = ?, location = ?,
+         image_url = COALESCE(?, image_url),
          year = COALESCE(?, year),
          mileage = COALESCE(?, mileage),
          plate_reg = COALESCE(?, plate_reg),

@@ -5,6 +5,95 @@ discovered about AutoTrader that aren't obvious from the code. Newest first.
 
 ---
 
+## 2026-08-10 — Detail modal with the full photo gallery
+
+The result cards showed one thumbnail and a link out to AutoTrader. Now tapping
+the photo or title opens the whole advert in place.
+
+### Fetched, not stored
+
+The advert is fetched when you open it, reusing `fetchDetailPage` and
+`extractAdvert` from the enrichment path. Storing every payload would add ~200KB
+per listing for the few you actually look at, and photos, price and availability
+all change. The cost is one request per open — user-initiated and rare — and a
+sold advert reports itself plainly (404 → "no longer on AutoTrader") instead of
+silently serving stale data.
+
+### `fullDetail.ts`, separate from `normalise.ts`
+
+`normaliseAdvert` deliberately extracts only what matching needs, and the drain
+depends on it. Rather than widen it, `normaliseFullDetail` is a second reader of
+the same `RawAdvert`: gallery with Interior/Exterior tags, spec tables, the
+equipment list with Standard/Optional, the seller's description, MOT and service
+history, the vehicle checks, and the seller.
+
+Image URLs contain a literal `{resize}` token that AutoTrader's own site swaps
+for `w600`/`w800`; left alone the URL 404s. `expandImageUrl` fills it, which also
+lets thumbnails pull 160px versions instead of full-size originals.
+
+Section shapes vary wildly between adverts — 10, 32, 44 and 68 photos across the
+fixtures and live tests; a private advert with no spec table and no description;
+a dealer's with 110 features in one "Other" bucket. Every section is optional and
+nothing throws on a missing one.
+
+### Verified
+
+Live against a real advert: 68 photos in two categories, 7 feature groups, 16
+description paragraphs, 5 history checks. In the browser: counter 1/68 → 2/68 on
+next, Interior filter → 1/39, Escape closes and restores body scroll, no console
+errors.
+
+One blemish found by looking at it: the MOT badge read "MOT 12 months MOT
+included", because AutoTrader's value sometimes already contains the word. Now
+only prefixed when it doesn't.
+
+### Follow-up: missing thumbnails, modal padding, and a wrong-model advert
+
+**Cards without a photo.** `image_url` was only ever written by `applyDetail`,
+so a listing had no thumbnail until the 15-minute detail queue reached it — on
+the free plan, potentially hours after a big first run. The database confirmed
+it exactly: 80 unenriched listings had 0 photos, 40 enriched had 40.
+
+`SearchListing` turns out to expose `images: [String]!` — the whole gallery, in
+the search response we already make. The cover photo is now stored at first
+sighting, and `applyDetail` uses `COALESCE` so enrichment can't blank one it
+lacks. Verified on a clean database: 35 listings, 35 photos, 27 of them still
+unenriched, 0 broken images in the browser.
+
+**Modal padding**, as asked.
+
+**A Mazda6 in a Mazda2 search.** Spotted in the padding screenshot. The same
+promoted-advert problem as the £17,250 car, through a different hole: `match.ts`
+verified make and price but never *model*, so a £11,700 Mazda6 passed both. Now
+checked against the title, comparing with punctuation and case stripped — the
+facet says "C-Class" where a title says "C Class". Read-time verification meant
+it disappeared without a refresh; a fresh run now rejects 4 rather than 2.
+
+### Follow-up: why a search wouldn't save
+
+Reported as "the test scenario can't be saved". Reproduced in the browser: the
+combination was fine — make selected, label derived — but **Save was greyed out
+because the postcode was empty, and nothing said so.** The only hint covered a
+missing make. Checked whether the requirement was self-imposed: it isn't, the
+search gateway rejects a request without one ("postcode - A required filter").
+
+The disabled button now names exactly what is missing, and which combination it
+is missing from.
+
+The "Use MINI + Mazda2 example" button is gone. It existed to seed a test
+scenario, which a script does better: `pnpm run seed [--refresh] [--url ...]`.
+It posts through the API rather than writing to D1, so it exercises the same
+validation the browser does, works against a deployed Worker, and can't hit the
+SQLITE_BUSY that touching the local database while wrangler holds it causes.
+
+### Process note
+
+`pnpm run typecheck | tail -2 && echo OK` reported success while tsc was
+failing — `tail` exits 0 regardless, so the `&&` always fired. Check the exit
+code of the command itself, not of a pipeline ending in `tail`.
+
+---
+
 ## 2026-08-10 — Facet-driven filters with a Make/Model/Variant cascade
 
 The editor was ten free-text boxes covering only the fields from the original

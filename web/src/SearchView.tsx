@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, rememberSearchId, type ResultsResponse, type RunRow } from './api';
 import { ResultCard } from './ResultCard';
+import { ListingModal } from './ListingModal';
 import { relativeTime, sortResults, type SortKey } from './format';
 
 const SORTS: { key: SortKey; label: string }[] = [
@@ -22,6 +23,7 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
   const [onlyNew, setOnlyNew] = useState(false);
   const [onlyStarred, setOnlyStarred] = useState(false);
   const [showRuns, setShowRuns] = useState(false);
+  const [openAdvertId, setOpenAdvertId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -218,9 +220,14 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
               listing={listing}
               onToggleStar={toggleStar}
               onSetVrm={saveVrm}
+              onOpen={setOpenAdvertId}
             />
           ))}
         </div>
+      )}
+
+      {openAdvertId && (
+        <ListingModal advertId={openAdvertId} onClose={() => setOpenAdvertId(null)} />
       )}
     </>
   );

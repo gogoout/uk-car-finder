@@ -1,7 +1,8 @@
 import type { Combo, FilterSelections, ResultListing, SavedSearch } from '../../src/types';
 import type { FacetData } from '../../src/autotrader/facets';
+import type { FullDetail } from '../../src/autotrader/fullDetail';
 
-export type { Combo, FacetData, FilterSelections, ResultListing, SavedSearch };
+export type { Combo, FacetData, FilterSelections, FullDetail, ResultListing, SavedSearch };
 
 export interface RunRow {
   id: number;
@@ -51,6 +52,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ filters, postcode: postcode || undefined, radius }),
     }),
+
+  /** Everything AutoTrader publishes about one advert, fetched on demand. */
+  getListingDetail: (advertId: string) =>
+    request<FullDetail>(`/api/listings/${advertId}/detail`),
 
   listSearches: () => request<SavedSearch[]>('/api/searches'),
 

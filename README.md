@@ -70,6 +70,17 @@ Vite only renders the SPA — `/api` is proxied to the Worker, so `pnpm run dev`
 must already be running. If it isn't, you'll get
 `ECONNREFUSED 127.0.0.1:8787`; start the Worker and reload.
 
+Get something on screen without clicking through the editor:
+
+```bash
+pnpm run seed --refresh     # creates a test search and runs it
+pnpm run seed --url https://uk-car-finder.<you>.workers.dev
+```
+
+It goes through the API rather than writing to D1, so it works against a
+deployed Worker too, and it can't hit the `SQLITE_BUSY` you get from touching
+the local database while `wrangler dev` holds it.
+
 Trigger the cron by hand:
 
 ```bash
@@ -103,6 +114,7 @@ everything else works normally.
 | `pnpm run typecheck` | Worker and SPA |
 | `pnpm run build` | Build the SPA into `web/dist` |
 | `pnpm run capture:fixture <id>` | Capture a trimmed test fixture from a live advert |
+| `pnpm run seed` | Create a test search (add `--refresh` to run it immediately) |
 
 ## How it works
 

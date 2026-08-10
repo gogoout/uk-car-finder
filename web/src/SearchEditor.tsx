@@ -8,48 +8,6 @@ const newCombo = (): Combo => ({
   filters: {},
 });
 
-/**
- * Your worked example, offered as a starting point so the first search is one
- * click rather than twenty dropdowns.
- */
-const EXAMPLE_COMBOS: Combo[] = [
-  {
-    id: 'mini',
-    label: 'MINI Cooper 1.5 Auto',
-    labelIsCustom: true,
-    filters: {
-      make: ['MINI'],
-      model: ['Cooper'],
-      min_year_manufactured: ['2015'],
-      max_year_manufactured: ['2016'],
-      min_engine_size: ['1.4'],
-      max_engine_size: ['1.6'],
-      max_mileage: ['85000'],
-      min_price: ['5500'],
-      max_price: ['7000'],
-      transmission: ['Automatic'],
-      is_writeoff: ['exclude'],
-    },
-  },
-  {
-    id: 'mazda',
-    label: 'Mazda2 1.5 Skyactiv-G Auto',
-    labelIsCustom: true,
-    filters: {
-      make: ['MAZDA'],
-      model: ['Mazda2'],
-      min_year_manufactured: ['2015'],
-      min_engine_size: ['1.4'],
-      max_engine_size: ['1.6'],
-      max_mileage: ['80000'],
-      min_price: ['6000'],
-      max_price: ['8000'],
-      transmission: ['Automatic'],
-      is_writeoff: ['exclude'],
-    },
-  },
-];
-
 export function SearchEditor({
   existing,
   onSaved,
@@ -65,6 +23,19 @@ export function SearchEditor({
   const [combos, setCombos] = useState<Combo[]>(existing?.combos ?? [newCombo()]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // AutoTrader rejects a search with no postcode ("a required filter"), and a
+  // combination with no make would match the entire site.
+  const blockers = [
+    ...(postcode.trim() ? [] : ['enter a postcode']),
+    ...combos
+      .map((combo, index) =>
+        combo.filters.make?.length
+          ? null
+          : `choose a make for ${combo.label || `combination ${index + 1}`}`,
+      )
+      .filter((reason): reason is string => reason !== null),
+  ];
 
   const save = async () => {
     setSaving(true);
@@ -128,13 +99,8 @@ export function SearchEditor({
         </div>
       </div>
 
-      <div className="spread" style={{ margin: '18px 0 8px' }}>
+      <div style={{ margin: '18px 0 8px' }}>
         <strong>Combinations</strong>
-        {!existing && (
-          <button className="link" onClick={() => setCombos(EXAMPLE_COMBOS)}>
-            Use MINI + Mazda2 example
-          </button>
-        )}
       </div>
 
       {combos.map((combo, index) => (
@@ -153,16 +119,17 @@ export function SearchEditor({
 
       <div className="row">
         <button onClick={() => setCombos([...combos, newCombo()])}>+ Add combination</button>
-        <button
-          className="primary"
-          onClick={save}
-          disabled={saving || !postcode.trim() || !combos.every((c) => c.filters.make?.length)}
-        >
+        <button className="primary" onClick={save} disabled={saving || blockers.length > 0}>
           {saving ? 'Saving…' : 'Save search'}
         </button>
       </div>
-      {!combos.every((c) => c.filters.make?.length) && (
-        <div className="tiny muted">Every combination needs a make before it can be saved.</div>
+
+      {/* A greyed-out button with no explanation is a dead end — say exactly
+          what is missing, and which combination it is missing from. */}
+      {blockers.length > 0 && (
+        <div className="tiny muted" role="status">
+          Before saving: {blockers.join('; ')}.
+        </div>
       )}
     </>
   );

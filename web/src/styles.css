@@ -202,6 +202,152 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
 .banner { padding: 10px 12px; border-radius: 10px; background: var(--bad-bg); color: var(--bad); font-size: 14px; margin-bottom: 12px; }
 .banner.info { background: var(--surface-2); color: var(--muted); }
 
+/* ------------------------------------------------------------ detail modal */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/* Full-height sheet on a phone; a centred dialog once there's room. */
+.modal {
+  background: var(--bg);
+  width: 100%;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px 14px 0 0;
+  overflow: hidden;
+}
+
+@media (min-width: 720px) {
+  .modal-backdrop { align-items: center; padding: 24px; }
+  .modal-body { padding: 20px; }
+  .modal { max-width: 780px; max-height: 88dvh; border-radius: 14px; }
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.modal-heading { flex: 1; min-width: 0; }
+.modal-heading strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.modal-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+  /* Clears the iOS home indicator. */
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
+}
+.modal-body > * + * { margin-top: 16px; }
+.modal-loading { padding: 40px 0; text-align: center; }
+.modal-price { align-items: baseline; }
+
+.kv { margin: 0; display: grid; gap: 6px; }
+.kv > div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.kv dt { color: var(--muted); font-size: 13px; }
+.kv dd { margin: 0; text-align: right; font-size: 14px; }
+
+.feature-list { margin: 6px 0 0; padding-left: 18px; }
+.feature-list li { margin-bottom: 2px; }
+
+/* ----------------------------------------------------------------- gallery */
+
+.gallery-main {
+  position: relative;
+  background: var(--surface-2);
+  border-radius: 10px;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+}
+.gallery-main img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.gallery-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  font-size: 24px;
+  line-height: 1;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+}
+.gallery-nav.prev { left: 8px; }
+.gallery-nav.next { right: 8px; }
+
+.gallery-counter,
+.gallery-tag {
+  position: absolute;
+  bottom: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+.gallery-counter { right: 8px; }
+.gallery-tag { left: 8px; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.gallery-chips { margin-top: 8px; gap: 6px; }
+.chip {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.chip.is-active { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+
+.gallery-strip {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+.gallery-thumb {
+  flex: none;
+  width: 72px;
+  height: 54px;
+  padding: 0;
+  min-height: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 2px solid transparent;
+}
+.gallery-thumb.is-active { border-color: var(--accent); }
+.gallery-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gallery-empty { padding: 30px; text-align: center; background: var(--surface-2); border-radius: 10px; }
+
+/* Photo and title are the way into the modal. */
+.listing-thumb-button { padding: 0; min-height: 0; border: none; background: none; border-radius: 8px; flex: none; }
+.listing-title-button {
+  padding: 0;
+  min-height: 0;
+  border: none;
+  background: none;
+  border-radius: 0;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  display: inline;
+}
+
 /* ------------------------------------------------------ combination card */
 
 /* Collapsed, the card is just its header row — so several combinations stay
@@ -272,6 +418,12 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
 }
 
 .facet-body { padding: 4px 12px 14px; }
+.modal .facet-head { padding: 10px 14px; }
+.modal .facet-body { padding: 6px 14px 16px; }
+.modal .facet-body > * + * { margin-top: 12px; }
+.modal .facet-body h4 { margin: 14px 0 6px; }
+.modal .facet-body h4:first-child { margin-top: 0; }
+.modal .facet-body p { margin: 0 0 8px; }
 .facet-empty { padding: 10px 0; }
 
 /* -------------------------------------------------- searchable select */
