@@ -14,10 +14,12 @@ export function ResultCard({
   listing,
   onToggleStar,
   onSetVrm,
+  onOpen,
 }: {
   listing: ResultListing;
   onToggleStar: (advertId: string, starred: boolean) => void;
   onSetVrm: (advertId: string, vrm: string) => void;
+  onOpen: (advertId: string) => void;
 }) {
   const [vrmDraft, setVrmDraft] = useState(listing.vrm ?? '');
 
@@ -26,15 +28,24 @@ export function ResultCard({
   return (
     <article className={`card listing${listing.isNew ? ' is-new' : ''}`}>
       <div className="listing-head">
+        {/* Photo and title both open the full advert — the link out to
+            AutoTrader lives inside the modal, so the card has one action. */}
         {listing.imageUrl && (
-          <img className="listing-thumb" src={listing.imageUrl} alt="" loading="lazy" />
+          <button
+            type="button"
+            className="listing-thumb-button"
+            aria-label={`View all photos and details for ${listing.title}`}
+            onClick={() => onOpen(listing.advertId)}
+          >
+            <img className="listing-thumb" src={listing.imageUrl} alt="" loading="lazy" />
+          </button>
         )}
         <div style={{ minWidth: 0, flex: 1 }}>
           <div className="listing-title">
-            <a href={listing.detailUrl} target="_blank" rel="noreferrer">
+            <button type="button" className="listing-title-button" onClick={() => onOpen(listing.advertId)}>
               {listing.year ? `${listing.year} ` : ''}
               {listing.title}
-            </a>
+            </button>
           </div>
           <div className="listing-sub">{listing.subTitle}</div>
         </div>

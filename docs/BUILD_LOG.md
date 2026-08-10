@@ -5,6 +5,56 @@ discovered about AutoTrader that aren't obvious from the code. Newest first.
 
 ---
 
+## 2026-08-10 — Detail modal with the full photo gallery
+
+The result cards showed one thumbnail and a link out to AutoTrader. Now tapping
+the photo or title opens the whole advert in place.
+
+### Fetched, not stored
+
+The advert is fetched when you open it, reusing `fetchDetailPage` and
+`extractAdvert` from the enrichment path. Storing every payload would add ~200KB
+per listing for the few you actually look at, and photos, price and availability
+all change. The cost is one request per open — user-initiated and rare — and a
+sold advert reports itself plainly (404 → "no longer on AutoTrader") instead of
+silently serving stale data.
+
+### `fullDetail.ts`, separate from `normalise.ts`
+
+`normaliseAdvert` deliberately extracts only what matching needs, and the drain
+depends on it. Rather than widen it, `normaliseFullDetail` is a second reader of
+the same `RawAdvert`: gallery with Interior/Exterior tags, spec tables, the
+equipment list with Standard/Optional, the seller's description, MOT and service
+history, the vehicle checks, and the seller.
+
+Image URLs contain a literal `{resize}` token that AutoTrader's own site swaps
+for `w600`/`w800`; left alone the URL 404s. `expandImageUrl` fills it, which also
+lets thumbnails pull 160px versions instead of full-size originals.
+
+Section shapes vary wildly between adverts — 10, 32, 44 and 68 photos across the
+fixtures and live tests; a private advert with no spec table and no description;
+a dealer's with 110 features in one "Other" bucket. Every section is optional and
+nothing throws on a missing one.
+
+### Verified
+
+Live against a real advert: 68 photos in two categories, 7 feature groups, 16
+description paragraphs, 5 history checks. In the browser: counter 1/68 → 2/68 on
+next, Interior filter → 1/39, Escape closes and restores body scroll, no console
+errors.
+
+One blemish found by looking at it: the MOT badge read "MOT 12 months MOT
+included", because AutoTrader's value sometimes already contains the word. Now
+only prefixed when it doesn't.
+
+### Process note
+
+`pnpm run typecheck | tail -2 && echo OK` reported success while tsc was
+failing — `tail` exits 0 regardless, so the `&&` always fired. Check the exit
+code of the command itself, not of a pipeline ending in `tail`.
+
+---
+
 ## 2026-08-10 — Facet-driven filters with a Make/Model/Variant cascade
 
 The editor was ten free-text boxes covering only the fields from the original

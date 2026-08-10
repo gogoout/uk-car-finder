@@ -4,6 +4,9 @@ import { refreshAllSearches, refreshSearch } from './jobs/refresh';
 import { drainDetailQueue } from './jobs/drain';
 import { fetchMotHistory, isMotConfigured } from './mot/dvsa';
 import { fetchFacets } from './autotrader/facets';
+import { fetchDetailPage } from './autotrader/gateway';
+import { extractAdvert } from './autotrader/detail';
+import { normaliseFullDetail } from './autotrader/fullDetail';
 import { getFacets, pruneFacetCache } from './db/facetCache';
 import { searchLevelFilters, type FilterInput } from './autotrader/filters';
 import { FILTER, type Combo, type FilterSelections, type SavedSearch } from './types';
@@ -232,6 +235,37 @@ app.post('/api/searches/:id/refresh', async (c) => {
   const drained = await drainDetailQueue(c.env.DB, { batchSize: 8 });
 
   return c.json({ ...result, drained });
+});
+
+/**
+ * Everything AutoTrader publishes about one advert, for the detail modal.
+ *
+ * Fetched live rather than stored: photos, price and availability all change,
+ * and keeping ~200KB per listing for the few you actually open would bloat D1
+ * for nothing. One request per open, which is user-initiated and rare.
+ */
+app.get('/api/listings/:advertId/detail', async (c) => {
+  const advertId = c.req.param('advertId');
+  if (!/^\d{6,20}$/.test(advertId)) return c.json({ error: 'Invalid advert id' }, 400);
+
+  try {
+    const html = await fetchDetailPage(advertId);
+    return c.json(normaliseFullDetail(extractAdvert(html), advertId));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Could not load this advert';
+    // A 404 from AutoTrader means the advert is gone, which is worth saying
+    // plainly rather than reporting as a generic failure.
+    const gone = message.includes('404');
+    return c.json(
+      {
+        error: gone
+          ? 'This advert is no longer on AutoTrader — it has probably sold.'
+          : `Could not load this advert: ${message}`,
+        gone,
+      },
+      gone ? 404 : 502,
+    );
+  }
 });
 
 app.post('/api/listings/:advertId/star', async (c) => {
