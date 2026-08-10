@@ -58,8 +58,8 @@ Two repository secrets are needed (Settings → Secrets and variables → Action
 
 | Secret | Notes |
 |---|---|
-| `CLOUDFLARE_API_TOKEN` | Scope to this account only, with **Workers Scripts:Edit** and **D1:Edit**. The stock "Edit Cloudflare Workers" template alone can't apply migrations. |
-| `CLOUDFLARE_ACCOUNT_ID` | From the Cloudflare dashboard sidebar. |
+| `CLOUDFLARE_API_TOKEN` | An **account-owned** token (Manage Account → Account API Tokens), with **Workers Scripts:Edit** and **D1:Edit**. The stock "Edit Cloudflare Workers" template alone can't apply migrations. A user token works too, but an account-owned one isn't tied to a person. |
+| `CLOUDFLARE_ACCOUNT_ID` | From the dashboard sidebar. Required — supplying it is what lets an account-owned token work, since wrangler otherwise tries a membership lookup that account tokens cannot grant. |
 
 `database_id` in `wrangler.jsonc` is committed deliberately — it identifies the
 database but grants nothing without the API token. DVSA secrets are set with

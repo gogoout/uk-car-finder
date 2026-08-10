@@ -72,7 +72,9 @@ jobs:
           if [ -n "$missing" ]; then
             echo "::error::Missing repository secret(s):$missing"
             echo "Add them under Settings -> Secrets and variables -> Actions."
-            echo "The API token needs Workers Scripts:Edit and D1:Edit."
+            echo "Use an account-owned token (Manage Account -> Account API Tokens)"
+            echo "with Workers Scripts:Edit and D1:Edit. The account id must be set too:"
+            echo "it is what stops wrangler attempting a membership lookup those tokens cannot grant."
             exit 1
           fi
 
