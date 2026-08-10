@@ -1,0 +1,13 @@
+# Copy to .dev.vars for local development. .dev.vars is gitignored.
+# In production set these with `wrangler secret put <NAME>` — never commit them.
+#
+# DVSA MOT History API credentials, emailed to you after registering at
+# https://documentation.history.mot.api.gov.uk/mot-history-api/register
+# Without these the MOT panel stays disabled; everything else works.
+
+DVSA_CLIENT_ID=
+DVSA_CLIENT_SECRET=
+DVSA_API_KEY=
+# The full tenant-specific token URL from the same email, e.g.
+# https://login.microsoftonline.com/<tenantId>/oauth2/v2.0/token
+DVSA_TOKEN_URL=

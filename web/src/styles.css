@@ -1,0 +1,203 @@
+/* Mobile-first. Everything is sized for a phone; the only breakpoint widens
+   the result grid on larger screens. */
+
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f0f2f5;
+  --border: #dfe3e8;
+  --text: #12161c;
+  --muted: #5b6472;
+  --accent: #1f6feb;
+  --accent-text: #ffffff;
+  --good: #12805c;
+  --good-bg: #dcf5ec;
+  --warn: #9a5b00;
+  --warn-bg: #fdf0da;
+  --bad: #b3261e;
+  --bad-bg: #fbe4e2;
+  --new: #6d28d9;
+  --new-bg: #ede4fd;
+  --radius: 12px;
+  --tap: 44px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1116;
+    --surface: #161b22;
+    --surface-2: #1f2630;
+    --border: #2b333d;
+    --text: #e6edf3;
+    --muted: #9aa5b1;
+    --accent: #4f9bff;
+    --accent-text: #06121f;
+    --good: #4ad4a4;
+    --good-bg: #102a22;
+    --warn: #e0a94a;
+    --warn-bg: #2c2213;
+    --bad: #ff8a80;
+    --bad-bg: #2e1614;
+    --new: #c4b5fd;
+    --new-bg: #241b3d;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+a { color: var(--accent); }
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px 14px 96px;
+}
+
+header.top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+header.top h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.tiny { font-size: 12px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+/* ------------------------------------------------------------- controls */
+
+button, .btn {
+  min-height: var(--tap);
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+}
+
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; font-weight: 600; }
+button.danger { color: var(--bad); }
+button.link { background: none; border: none; min-height: auto; padding: 0; color: var(--accent); text-decoration: underline; }
+button.icon { min-width: var(--tap); padding: 0; font-size: 20px; line-height: 1; }
+
+input, select {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  /* 16px keeps iOS Safari from zooming in on focus. */
+  font-size: 16px;
+}
+
+label { display: block; }
+label > span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid-3 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.stack > * + * { margin-top: 10px; }
+.spread { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+  padding: 8px 0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.checkbox { display: flex; align-items: center; gap: 8px; min-height: var(--tap); }
+.checkbox input { width: 20px; height: 20px; min-height: 0; flex: none; }
+
+/* --------------------------------------------------------------- badges */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.badge.good { background: var(--good-bg); color: var(--good); }
+.badge.warn { background: var(--warn-bg); color: var(--warn); }
+.badge.bad  { background: var(--bad-bg);  color: var(--bad); }
+.badge.new  { background: var(--new-bg);  color: var(--new); }
+.badge.combo { background: var(--surface-2); color: var(--muted); font-weight: 500; }
+
+/* -------------------------------------------------------------- results */
+
+.results { display: grid; gap: 12px; }
+
+@media (min-width: 720px) {
+  .results { grid-template-columns: repeat(2, 1fr); }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+}
+
+.listing { display: flex; flex-direction: column; gap: 8px; }
+.listing.is-new { border-color: var(--new); }
+
+.listing-head { display: flex; gap: 12px; }
+.listing-thumb {
+  width: 96px;
+  height: 72px;
+  flex: none;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.listing-title { font-weight: 600; line-height: 1.3; }
+.listing-sub { font-size: 13px; color: var(--muted); }
+.price { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.price-was { font-size: 13px; color: var(--muted); text-decoration: line-through; margin-left: 6px; }
+
+.specs { display: flex; flex-wrap: wrap; gap: 6px; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.empty { text-align: center; padding: 40px 16px; color: var(--muted); }
+
+.runs { width: 100%; border-collapse: collapse; font-size: 13px; }
+.runs th, .runs td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.runs th { color: var(--muted); font-weight: 500; }
+.scroll-x { overflow-x: auto; }
+
+.banner { padding: 10px 12px; border-radius: 10px; background: var(--bad-bg); color: var(--bad); font-size: 14px; margin-bottom: 12px; }
+.banner.info { background: var(--surface-2); color: var(--muted); }
