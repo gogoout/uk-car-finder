@@ -24,6 +24,28 @@ only, `smoke` after a successful deploy.
 - Two guard steps fail with plain messages if `database_id` is still
   `REPLACE_ME` or the secrets are missing, instead of an opaque wrangler error.
 
+### workers.dev would have quietly reopened on the next deploy
+
+A custom domain behind Cloudflare Access was set up in the dashboard. The repo
+knew nothing about it, and that is not neutral: `workers_dev` **defaults to
+true**, so every deploy re-creates a `*.workers.dev` URL — one that answers
+without passing through the Access policy, which only covers the custom domain.
+Cloudflare's docs also state that wrangler overrides dashboard-configured routes
+on deploy.
+
+So the next merge to `main` would have silently reopened an unauthenticated way
+in. Fixed with `workers_dev: false` and `preview_urls: false`.
+
+`preview_urls` matters just as much and is easier to miss: it publishes
+`<version>-<name>.<subdomain>.workers.dev`, which the custom domain's Access
+policy does not cover.
+
+No `routes` key, on purpose — the hostname stays out of a public repo, and
+Cloudflare's documented way to keep routes dashboard-managed is to omit the keys
+and set `workers_dev: false`. Confirmed `wrangler deploy --dry-run` accepts
+that combination: routes are normally required when `workers_dev` is false, but
+a Worker with cron triggers is exempt.
+
 ### The smoke job lasted exactly one deploy
 
 It was wired to run after each deploy. AutoTrader returned **HTTP 403 on the

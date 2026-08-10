@@ -6,6 +6,18 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
+	// Serve only from the custom domain, which sits behind Cloudflare Access.
+	// Both of these default to true, so leaving them out means every deploy
+	// re-creates a *.workers.dev URL that answers without going through Access.
+	// preview_urls matters as much as workers_dev: it publishes
+	// <version>-<name>.<subdomain>.workers.dev, which the Access policy on the
+	// custom domain does not cover.
+	"workers_dev": false,
+	"preview_urls": false,
+	// No `routes` key on purpose: wrangler overrides dashboard-configured
+	// routes with whatever the config declares, and omitting it leaves the
+	// custom domain set up in the dashboard alone. Crons mean routes are not
+	// required here.
 	"assets": {
 		"directory": "./web/dist",
 		"binding": "ASSETS",
