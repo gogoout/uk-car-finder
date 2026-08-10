@@ -50,6 +50,34 @@ describe('normaliseSearchListing', () => {
   it('drops the empty objects AutoTrader returns for sponsored slots', () => {
     expect(normaliseSearchListing({})).toBeNull();
   });
+
+  /**
+   * Cards used to have no photo until the detail queue reached them, which on
+   * the free plan could be hours. Search results carry the gallery, so the
+   * cover photo is available from the first sighting.
+   */
+  it('takes a cover photo from the search results', () => {
+    const listing = normaliseSearchListing({
+      advertId: '1',
+      fpaLink: '/car-details/1',
+      images: [
+        'https://m.atcdn.co.uk/a/media/{resize}/first.jpg',
+        'https://m.atcdn.co.uk/a/media/{resize}/second.jpg',
+      ],
+    });
+
+    expect(listing!.imageUrl).toBe('https://m.atcdn.co.uk/a/media/{resize}/first.jpg');
+  });
+
+  it('reports no photo rather than an empty string when the advert has none', () => {
+    expect(normaliseSearchListing({ advertId: '1', fpaLink: '/x', images: [] })!.imageUrl).toBeNull();
+    expect(normaliseSearchListing({ advertId: '1', fpaLink: '/x' })!.imageUrl).toBeNull();
+    // A null entry in the array must not become the cover photo.
+    expect(
+      normaliseSearchListing({ advertId: '1', fpaLink: '/x', images: [null, 'https://x/a.jpg'] })!
+        .imageUrl,
+    ).toBe('https://x/a.jpg');
+  });
 });
 
 describe('buildFilters', () => {

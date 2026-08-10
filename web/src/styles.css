@@ -227,6 +227,7 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
 
 @media (min-width: 720px) {
   .modal-backdrop { align-items: center; padding: 24px; }
+  .modal-body { padding: 20px; }
   .modal { max-width: 780px; max-height: 88dvh; border-radius: 14px; }
 }
 
@@ -234,7 +235,7 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
@@ -244,11 +245,11 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
 .modal-body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 12px;
+  padding: 16px;
   /* Clears the iOS home indicator. */
-  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
 }
-.modal-body > * + * { margin-top: 12px; }
+.modal-body > * + * { margin-top: 16px; }
 .modal-loading { padding: 40px 0; text-align: center; }
 .modal-price { align-items: baseline; }
 
@@ -417,6 +418,12 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
 }
 
 .facet-body { padding: 4px 12px 14px; }
+.modal .facet-head { padding: 10px 14px; }
+.modal .facet-body { padding: 6px 14px 16px; }
+.modal .facet-body > * + * { margin-top: 12px; }
+.modal .facet-body h4 { margin: 14px 0 6px; }
+.modal .facet-body h4:first-child { margin-top: 0; }
+.modal .facet-body p { margin: 0 0 8px; }
 .facet-empty { padding: 10px 0; }
 
 /* -------------------------------------------------- searchable select */

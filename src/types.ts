@@ -109,6 +109,8 @@ export interface SearchListing {
   sellerType: string | null;
   detailPath: string;
   imageCount: number | null;
+  /** Cover photo, still containing AutoTrader's `{resize}` token. */
+  imageUrl: string | null;
 }
 
 /** What we learn from a detail page (one request per listing, queued). */

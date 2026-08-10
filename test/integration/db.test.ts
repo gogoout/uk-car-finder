@@ -101,6 +101,28 @@ describe('detail enrichment', () => {
     expect(row.detail_fetched_at).not.toBeNull();
   });
 
+  it('gives a listing its cover photo before the detail queue reaches it', async () => {
+    await db.upsertSearchListing(DB, searchListing());
+
+    const row = await DB.prepare('SELECT image_url, detail_fetched_at FROM listings WHERE advert_id = ?')
+      .bind('1')
+      .first<any>();
+
+    expect(row.image_url).toBe('https://m.atcdn.co.uk/a/media/{resize}/cover.jpg');
+    expect(row.detail_fetched_at).toBeNull();
+  });
+
+  it('does not blank the cover photo when enrichment has none of its own', async () => {
+    await db.upsertSearchListing(DB, searchListing());
+
+    await db.applyDetail(DB, { ...normaliseAdvert({}), advertId: '1', imageUrl: null });
+
+    const row = await DB.prepare('SELECT image_url FROM listings WHERE advert_id = ?')
+      .bind('1')
+      .first<any>();
+    expect(row.image_url).toBe('https://m.atcdn.co.uk/a/media/{resize}/cover.jpg');
+  });
+
   it('keeps a user-entered plate when the scraper finds none', async () => {
     await db.upsertSearchListing(DB, searchListing());
     await db.setVrm(DB, '1', 'yt66 cnk');

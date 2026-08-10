@@ -25,6 +25,7 @@ const QUERY = `query ${OPNAME}($filters: [FilterInput!]!, $channel: Channel!, $p
         fpaLink
         numberOfImages
         condition
+        images
         badges { type displayText }
       }
     }
@@ -46,6 +47,7 @@ interface RawListing {
   sellerType?: string | null;
   fpaLink?: string | null;
   numberOfImages?: number | null;
+  images?: (string | null)[] | null;
   badges?: RawBadge[] | null;
 }
 
@@ -127,6 +129,10 @@ export function normaliseSearchListing(raw: RawListing): SearchListing | null {
     // Strip the volatile searchId/sort query string so the path is stable.
     detailPath: raw.fpaLink.split('?')[0] ?? raw.fpaLink,
     imageCount: raw.numberOfImages ?? null,
+    // Search results carry the gallery, so a card has a photo straight away
+    // rather than waiting for the detail queue to reach it. Still contains the
+    // `{resize}` token — expand before use.
+    imageUrl: (raw.images ?? []).find((url): url is string => typeof url === 'string') ?? null,
   };
 }
 

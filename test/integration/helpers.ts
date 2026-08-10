@@ -77,5 +77,6 @@ export const searchListing = (overrides: Partial<SearchListing> = {}): SearchLis
   sellerType: 'TRADE',
   detailPath: '/car-details/1',
   imageCount: 10,
+  imageUrl: 'https://m.atcdn.co.uk/a/media/{resize}/cover.jpg',
   ...overrides,
 });

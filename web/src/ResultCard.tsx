@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ResultListing } from './api';
+import { expandImageUrl } from '../../src/autotrader/fullDetail';
 import {
   miles,
   money,
@@ -37,7 +38,14 @@ export function ResultCard({
             aria-label={`View all photos and details for ${listing.title}`}
             onClick={() => onOpen(listing.advertId)}
           >
-            <img className="listing-thumb" src={listing.imageUrl} alt="" loading="lazy" />
+            {/* Search images carry AutoTrader's {resize} token; older rows
+                stored an already-sized URL, which passes through unchanged. */}
+            <img
+              className="listing-thumb"
+              src={expandImageUrl(listing.imageUrl, 240)}
+              alt=""
+              loading="lazy"
+            />
           </button>
         )}
         <div style={{ minWidth: 0, flex: 1 }}>

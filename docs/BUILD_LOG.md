@@ -47,6 +47,28 @@ One blemish found by looking at it: the MOT badge read "MOT 12 months MOT
 included", because AutoTrader's value sometimes already contains the word. Now
 only prefixed when it doesn't.
 
+### Follow-up: missing thumbnails, modal padding, and a wrong-model advert
+
+**Cards without a photo.** `image_url` was only ever written by `applyDetail`,
+so a listing had no thumbnail until the 15-minute detail queue reached it — on
+the free plan, potentially hours after a big first run. The database confirmed
+it exactly: 80 unenriched listings had 0 photos, 40 enriched had 40.
+
+`SearchListing` turns out to expose `images: [String]!` — the whole gallery, in
+the search response we already make. The cover photo is now stored at first
+sighting, and `applyDetail` uses `COALESCE` so enrichment can't blank one it
+lacks. Verified on a clean database: 35 listings, 35 photos, 27 of them still
+unenriched, 0 broken images in the browser.
+
+**Modal padding**, as asked.
+
+**A Mazda6 in a Mazda2 search.** Spotted in the padding screenshot. The same
+promoted-advert problem as the £17,250 car, through a different hole: `match.ts`
+verified make and price but never *model*, so a £11,700 Mazda6 passed both. Now
+checked against the title, comparing with punctuation and case stripped — the
+facet says "C-Class" where a title says "C Class". Read-time verification meant
+it disappeared without a refresh; a fresh run now rejects 4 rather than 2.
+
 ### Process note
 
 `pnpm run typecheck | tail -2 && echo OK` reported success while tsc was

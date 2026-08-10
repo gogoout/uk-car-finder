@@ -38,6 +38,7 @@ const listing = (overrides: Partial<SearchListing> = {}): SearchListing => ({
   sellerType: 'TRADE',
   detailPath: '/car-details/1',
   imageCount: 10,
+  imageUrl: null,
   ...overrides,
 });
 
@@ -56,6 +57,33 @@ describe('matchesCombo', () => {
 
   it('rejects the £11,400 2022 promoted advert', () => {
     expect(matchesCombo(listing({ price: 11400, year: 2022 }), combo).matches).toBe(false);
+  });
+
+  /**
+   * A real promoted advert: a £11,700 Mazda6 returned for a Mazda2 search. It
+   * passed the make and price checks, so only a model check catches it.
+   */
+  it('rejects a promoted advert for the wrong model of the right make', () => {
+    const result = matchesCombo(listing({ title: 'Mazda Mazda6', price: 7500 }), combo);
+
+    expect(result.matches).toBe(false);
+    expect(result.reason).toContain('model mismatch');
+  });
+
+  it('matches a model whose punctuation differs from the title', () => {
+    // The facet says "C-Class"; the title says "C Class".
+    const merc: Combo = {
+      id: 'm',
+      label: 'C-Class',
+      filters: { make: ['MERCEDES-BENZ'], model: ['C-Class'] },
+    };
+    expect(matchesCombo(listing({ title: 'Mercedes-Benz C Class' }), merc).matches).toBe(true);
+  });
+
+  it('accepts any of several selected models', () => {
+    const multi = withFilters({ model: ['Mazda2', 'Mazda3'] });
+    expect(matchesCombo(listing({ title: 'Mazda Mazda3' }), multi).matches).toBe(true);
+    expect(matchesCombo(listing({ title: 'Mazda Mazda6' }), multi).matches).toBe(false);
   });
 
   it('rejects a car below the minimum year', () => {

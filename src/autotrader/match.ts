@@ -42,6 +42,13 @@ function includesIgnoreCase(haystack: string[], needle: string): boolean {
   return haystack.some((h) => h.toLowerCase() === needle.toLowerCase());
 }
 
+/**
+ * Strips case, spaces and punctuation so model names compare reliably: the
+ * facet says "C-Class" where the title says "C Class", and "Mazda2" where a
+ * title might say "Mazda 2".
+ */
+const squash = (value: string): string => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+
 export function matchesCombo(listing: SearchListing, combo: Combo): MatchResult {
   const makes = filterValues(combo, FILTER.make);
   if (makes.length > 0 && listing.title) {
@@ -54,6 +61,17 @@ export function matchesCombo(listing: SearchListing, combo: Combo): MatchResult 
     );
     if (!anyMakeMatches) {
       return fail(`make mismatch: "${listing.title}" is not ${makes.join('/')}`);
+    }
+  }
+
+  // Their padding is often the right make but the wrong model — a Mazda6
+  // returned for a Mazda2 search. `title` is "<make> <model>", so the model
+  // has to appear in it.
+  const models = filterValues(combo, FILTER.model);
+  if (models.length > 0 && listing.title) {
+    const title = squash(listing.title);
+    if (!models.some((model) => title.includes(squash(model)))) {
+      return fail(`model mismatch: "${listing.title}" is not ${models.join('/')}`);
     }
   }
 
@@ -178,6 +196,7 @@ export function storedListingMatches(listing: ResultListing, combo: Combo): Matc
     sellerType: listing.sellerType,
     detailPath: '',
     imageCount: null,
+    imageUrl: listing.imageUrl,
   };
 
   const searchResult = matchesCombo(asSearchListing, combo);
