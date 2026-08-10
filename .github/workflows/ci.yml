@@ -106,26 +106,3 @@ jobs:
       # keeps a third-party action out of the path of a deploy-capable token.
       - name: Deploy Worker
         run: pnpm exec wrangler deploy
-
-  smoke:
-    name: Smoke test the live site
-    needs: deploy
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      # Hits AutoTrader for real, which is the only way to detect them changing
-      # their schema. Deliberately its own job: a failure here means their API
-      # moved or the market is empty, not that the deploy went wrong — which has
-      # already succeeded by this point.
-      - run: pnpm run smoke

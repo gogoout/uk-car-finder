@@ -24,6 +24,31 @@ only, `smoke` after a successful deploy.
 - Two guard steps fail with plain messages if `database_id` is still
   `REPLACE_ME` or the secrets are missing, instead of an opaque wrangler error.
 
+### The smoke job lasted exactly one deploy
+
+It was wired to run after each deploy. AutoTrader returned **HTTP 403 on the
+first request** from GitHub's runners. Isolated it properly rather than guessing:
+the same commit, same code, passes from a laptop — so it is IP-range blocking,
+not schema drift and not the deploy.
+
+Removed rather than made non-blocking. A job that fails on every deploy is one
+you stop reading, which is the same crying-wolf failure already fixed inside the
+smoke script itself. The reason is recorded in `scripts/smoke.ts` so it does not
+get re-added.
+
+Two options were left on the table if post-deploy verification is wanted later:
+smoke-test the deployed Worker instead (its requests to AutoTrader originate
+from Cloudflare, not GitHub), which needs a Cloudflare Access service token once
+Access is enabled.
+
+### Also worth recording: secrets went to the wrong environment
+
+The first deploy failed on the guard step with both secrets empty. The cause was
+an environment accidentally *named* `CLOUDFLARE_ACCOUNT_ID` holding both
+secrets, while the workflow looked at `production` — which GitHub had created
+empty when the run referenced it. The guard reported exactly which secrets were
+missing and where they belonged, instead of an opaque wrangler auth error.
+
 ### The find
 
 While testing the `REPLACE_ME` guard, it passed when it should have failed —
