@@ -202,6 +202,43 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
 .banner { padding: 10px 12px; border-radius: 10px; background: var(--bad-bg); color: var(--bad); font-size: 14px; margin-bottom: 12px; }
 .banner.info { background: var(--surface-2); color: var(--muted); }
 
+/* ------------------------------------------------------ combination card */
+
+/* Collapsed, the card is just its header row — so several combinations stay
+   scannable instead of stacking 27 filter groups each. */
+.combo-card { padding: 0; overflow: hidden; }
+
+.combo-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
+}
+
+.combo-toggle {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 12px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  text-align: left;
+}
+
+.combo-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.combo-count { flex: none; }
+.combo-actions { flex: none; }
+.combo-body { padding: 0 12px 14px; }
+.combo-card.is-open .combo-head { border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+
 /* ------------------------------------------------------ facet accordion */
 
 .facets { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }

@@ -31,11 +31,19 @@ export function ComboEditor({
 }) {
   const [facets, setFacets] = useState<FacetData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  // A combo that already has a make is configured, so it opens collapsed —
+  // otherwise editing a saved search means scrolling past 27 groups per combo.
+  // A fresh one opens expanded, because it needs filling in.
+  const [open, setOpen] = useState(!combo.filters.make?.length);
   // Guards against an earlier, slower response overwriting a newer one.
   const requestId = useRef(0);
 
   useEffect(() => {
+    // No point fetching a collapsed panel's options — with several combos that
+    // is several wasted round trips on load.
+    if (!open) return;
+
     const id = ++requestId.current;
     setLoading(true);
     api
@@ -52,7 +60,9 @@ export function ComboEditor({
       .finally(() => {
         if (id === requestId.current) setLoading(false);
       });
-  }, [combo.filters, postcode, radius]);
+  }, [combo.filters, postcode, radius, open]);
+
+  const activeFilterCount = Object.keys(combo.filters).length;
 
   const setFilter = (filter: string, values: string[]) => {
     const next = { ...combo.filters };
@@ -70,11 +80,27 @@ export function ComboEditor({
   };
 
   return (
-    <div className="card stack">
-      <div className="spread">
-        <strong className="small">{combo.label || 'New combination'}</strong>
-        <span className="row">
-          {facets?.resultCount !== null && facets?.resultCount !== undefined && (
+    <div className={`card combo-card${open ? ' is-open' : ''}`}>
+      <div className="combo-head">
+        <button
+          type="button"
+          className="combo-toggle"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <span aria-hidden="true" className="facet-caret">
+            {open ? '▾' : '▸'}
+          </span>
+          <span className="combo-name">{combo.label || 'New combination'}</span>
+          {!open && activeFilterCount > 0 && (
+            <span className="tiny muted combo-count">
+              {activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'}
+            </span>
+          )}
+        </button>
+
+        <span className="row combo-actions">
+          {open && facets?.resultCount !== null && facets?.resultCount !== undefined && (
             <span className="badge">{facets.resultCount.toLocaleString('en-GB')} on AutoTrader</span>
           )}
           {canRemove && (
@@ -85,30 +111,34 @@ export function ComboEditor({
         </span>
       </div>
 
-      <label>
-        <span>Label (shown on matching cars)</span>
-        <input
-          value={combo.label}
-          placeholder="MINI Cooper 1.5 Auto"
-          onChange={(e) =>
-            onChange({ ...combo, label: e.target.value, labelIsCustom: e.target.value !== '' })
-          }
-        />
-      </label>
+      {open && (
+        <div className="stack combo-body">
+          <label>
+            <span>Label (shown on matching cars)</span>
+            <input
+              value={combo.label}
+              placeholder="MINI Cooper 1.5 Auto"
+              onChange={(e) =>
+                onChange({ ...combo, label: e.target.value, labelIsCustom: e.target.value !== '' })
+              }
+            />
+          </label>
 
-      {error && (
-        <div className="banner">
-          {error} — filter options are unavailable, but a saved combination still runs.
+          {error && (
+            <div className="banner">
+              {error} — filter options are unavailable, but a saved combination still runs.
+            </div>
+          )}
+
+          {!facets && loading && <div className="tiny muted">Loading filters…</div>}
+
+          {facets && (
+            <>
+              {loading && <div className="tiny muted">Updating options…</div>}
+              <FacetAccordion data={facets} selections={combo.filters} onChange={setFilter} />
+            </>
+          )}
         </div>
-      )}
-
-      {!facets && loading && <div className="tiny muted">Loading filters…</div>}
-
-      {facets && (
-        <>
-          {loading && <div className="tiny muted">Updating options…</div>}
-          <FacetAccordion data={facets} selections={combo.filters} onChange={setFilter} />
-        </>
       )}
     </div>
   );

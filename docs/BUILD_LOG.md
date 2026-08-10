@@ -76,6 +76,18 @@ real matches. Trusted to AutoTrader, and commented as such.
 - Facet responses are cached in D1 (1h TTL, keyed by filter context) and a stale
   copy is served if AutoTrader is unreachable — stale dropdowns beat none.
 
+### Follow-up: collapsible combination panels
+
+Review feedback: each combination panel should collapse to its name. With 27
+accordion groups inside each, two combinations made the editor about 4,000px
+tall before you could reach the save button.
+
+Panels now collapse to a header row showing the combo name and its active filter
+count. A combination that already has a make opens collapsed — it is configured,
+so editing a saved search stays scannable — while a fresh one opens expanded
+because it needs filling in. Collapsed panels also skip their facet fetch, which
+removes a round trip per combination on load.
+
 ### Self-inflicted note
 
 Running `wrangler d1 execute --local` while `wrangler dev` was up killed workerd
