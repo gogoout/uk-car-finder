@@ -56,30 +56,10 @@ describe('buildFilters', () => {
   const combo: Combo = {
     id: 'c1',
     label: 'MINI Cooper 1.5 Auto',
-    make: 'MINI',
-    model: 'Cooper',
-    minYear: 2015,
-    maxYear: 2016,
-    minEngineLitres: 1.4,
-    maxEngineLitres: 1.6,
-    maxMileage: 85000,
-    minPrice: 5500,
-    maxPrice: 7000,
-    transmission: 'Automatic',
-    excludeWriteOffs: true,
-  };
-
-  it('maps a combo onto AutoTrader filter names', () => {
-    const filters = buildFilters(combo, { postcode: 'SW1A 1AA', radius: 50 });
-    const byName = Object.fromEntries(filters.map((f) => [f.filter, f.selected]));
-
-    expect(byName).toMatchObject({
-      postcode: ['SW1A 1AA'],
-      // Their URL calls this `radius`; the gateway enum calls it `distance`.
-      distance: ['50'],
-      price_search_type: ['total'],
+    filters: {
       make: ['MINI'],
       model: ['Cooper'],
+      aggregated_trim: ['Classic'],
       min_year_manufactured: ['2015'],
       max_year_manufactured: ['2016'],
       min_engine_size: ['1.4'],
@@ -88,7 +68,37 @@ describe('buildFilters', () => {
       min_price: ['5500'],
       max_price: ['7000'],
       transmission: ['Automatic'],
+      is_writeoff: ['exclude'],
+    },
+  };
+
+  it('passes the combo bag straight through and adds the search-level filters', () => {
+    const filters = buildFilters(combo, { postcode: 'SW1A 1AA', radius: 50 });
+    const byName = Object.fromEntries(filters.map((f) => [f.filter, f.selected]));
+
+    expect(byName).toMatchObject({
+      postcode: ['SW1A 1AA'],
+      // Their URL calls this `radius`; the gateway enum calls it `distance`.
+      distance: ['50'],
+      price_search_type: ['total'],
+      ...combo.filters,
     });
+  });
+
+  it('carries filters it has never heard of, so new AutoTrader filters just work', () => {
+    const filters = buildFilters(
+      { id: 'c3', label: 'Future', filters: { make: ['MINI'], some_new_filter: ['a', 'b'] } },
+      { postcode: 'SW1A 1AA', radius: 50 },
+    );
+    expect(filters.find((f) => f.filter === 'some_new_filter')?.selected).toEqual(['a', 'b']);
+  });
+
+  it('preserves multi-select values as an OR', () => {
+    const filters = buildFilters(
+      { id: 'c4', label: 'Multi', filters: { make: ['MINI'], fuel_type: ['Petrol', 'Diesel'] } },
+      { postcode: 'SW1A 1AA', radius: 50 },
+    );
+    expect(filters.find((f) => f.filter === 'fuel_type')?.selected).toEqual(['Petrol', 'Diesel']);
   });
 
   it('omits the distance filter for a national search', () => {
@@ -96,26 +106,25 @@ describe('buildFilters', () => {
     expect(filters.find((f) => f.filter === 'distance')).toBeUndefined();
   });
 
-  it('omits absent optional fields rather than sending empty values', () => {
+  it('drops empty selections rather than sending an empty array', () => {
     const filters = buildFilters(
-      { id: 'c2', label: 'Any MINI', make: 'MINI' },
+      { id: 'c2', label: 'Any MINI', filters: { make: ['MINI'], model: [], transmission: [] } },
       { postcode: 'SW1A 1AA', radius: 50 },
     );
     const names = filters.map((f) => f.filter);
     expect(names).not.toContain('model');
-    expect(names).not.toContain('max_mileage');
     expect(names).not.toContain('transmission');
+    expect(names).toContain('make');
   });
 
-  it("asks AutoTrader to exclude write-offs with the only value their converter accepts", () => {
-    const on = buildFilters(combo, { postcode: 'SW1A 1AA', radius: 50 });
-    expect(on.find((f) => f.filter === 'is_writeoff')?.selected).toEqual(['false']);
-
-    const off = buildFilters(
-      { ...combo, excludeWriteOffs: false },
+  it('lets a combo override a search-level filter rather than sending both', () => {
+    const filters = buildFilters(
+      { id: 'c5', label: 'Near', filters: { make: ['MINI'], distance: ['10'] } },
       { postcode: 'SW1A 1AA', radius: 50 },
     );
-    expect(off.find((f) => f.filter === 'is_writeoff')).toBeUndefined();
+    const distances = filters.filter((f) => f.filter === 'distance');
+    expect(distances).toHaveLength(1);
+    expect(distances[0]!.selected).toEqual(['10']);
   });
 });
 

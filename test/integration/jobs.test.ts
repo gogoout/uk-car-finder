@@ -86,7 +86,7 @@ describe('refreshSearch', () => {
 
   it('discards promoted adverts that ignore the combo bounds', async () => {
     const search = savedSearch({
-      combos: [combo({ maxPrice: 8000, minYear: 2015 })],
+      combos: [combo({ max_price: ['8000'], min_year_manufactured: ['2015'] })],
     });
     await db.upsertSearch(DB, search);
 
@@ -120,7 +120,7 @@ describe('refreshSearch', () => {
 
   it('keeps going when one combo fails and records the failure on the run', async () => {
     const search = savedSearch({
-      combos: [combo({ id: 'c1', label: 'Broken' }), combo({ id: 'c2', label: 'Working' })],
+      combos: [combo({}, { id: 'c1', label: 'Broken' }), combo({}, { id: 'c2', label: 'Working' })],
     });
     await db.upsertSearch(DB, search);
 
@@ -167,7 +167,7 @@ describe('drainDetailQueue', () => {
     // The fixture is a 1.3L automatic; this combo wants 1.5-2.0L, which only
     // the detail page can disprove since engine size isn't in search results.
     const search = savedSearch({
-      combos: [combo({ minEngineLitres: 1.5, maxEngineLitres: 2.0 })],
+      combos: [combo({ min_engine_size: ['1.5'], max_engine_size: ['2.0'] })],
     });
     await db.upsertSearch(DB, search);
     await refreshSearch(DB, search, {
@@ -187,7 +187,7 @@ describe('drainDetailQueue', () => {
 
   it('keeps a listing linked when the detail page agrees with the combo', async () => {
     const search = savedSearch({
-      combos: [combo({ minEngineLitres: 1.2, maxEngineLitres: 1.4, transmission: 'Automatic' })],
+      combos: [combo({ min_engine_size: ['1.2'], max_engine_size: ['1.4'], transmission: ['Automatic'] })],
     });
     await db.upsertSearch(DB, search);
     await refreshSearch(DB, search, {

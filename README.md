@@ -10,6 +10,17 @@ It exists because AutoTrader's own search can't express *"a MINI Cooper 1.5 Auto
 
 Cloudflare Worker + D1 + cron. Mobile-first.
 
+## Filters
+
+The editor is driven by AutoTrader's own facet API, so it offers **everything
+they support** — all 27 filter groups — with their option lists, labels and live
+result counts. Make → Model → Variant cascades: pick a make and its models
+appear, pick a model and its variants appear. Filters AutoTrader adds later show
+up on their own, with no code change here.
+
+Each saved combination stores its selections keyed by AutoTrader's own filter
+names, so `src/autotrader/filters.ts` is close to a pass-through.
+
 ## What it shows
 
 Per listing: engine size, year, transmission, mileage, fuel, service history
@@ -91,6 +102,7 @@ everything else works normally.
 | `pnpm run smoke` | Live check against AutoTrader — detects schema drift |
 | `pnpm run typecheck` | Worker and SPA |
 | `pnpm run build` | Build the SPA into `web/dist` |
+| `pnpm run capture:fixture <id>` | Capture a trimmed test fixture from a live advert |
 
 ## How it works
 
@@ -106,6 +118,11 @@ cron */15 * * * * →  drain.ts     fetches ~35 detail pages, fills in service
 Saved searches live in D1 (the cron can't read your localStorage), so
 `/s/<id>` opens on any device. localStorage only tracks which searches are
 *yours*.
+
+Filter options come from AutoTrader's facet API via `POST /api/facets`, cached in
+D1 for an hour and keyed by the filter context (the cascade means MINI's models
+and Mazda's are different answers). If AutoTrader is unreachable, a stale cached
+copy is served rather than leaving the editor with no dropdowns.
 
 Searches are re-verified client-side after fetching: AutoTrader pads narrow
 searches with promoted adverts that ignore the filters, so `src/autotrader/match.ts`

@@ -27,7 +27,7 @@ describe('searches', () => {
 
   it('updates in place on re-save', async () => {
     await db.upsertSearch(DB, savedSearch());
-    await db.upsertSearch(DB, savedSearch({ name: 'Renamed', combos: [combo(), combo({ id: 'c2' })] }));
+    await db.upsertSearch(DB, savedSearch({ name: 'Renamed', combos: [combo(), combo({}, { id: 'c2' })] }));
 
     const all = await db.listSearches(DB);
     expect(all).toHaveLength(1);
@@ -178,7 +178,7 @@ describe('results and deltas', () => {
     const runId = await db.startRun(DB, 's1');
     await db.upsertSearchListing(DB, searchListing());
     await db.linkListingToCombo(DB, 's1', '1', combo(), runId);
-    await db.linkListingToCombo(DB, 's1', '1', combo({ id: 'c2', label: 'Any small auto' }), runId);
+    await db.linkListingToCombo(DB, 's1', '1', combo({}, { id: 'c2', label: 'Any small auto' }), runId);
     await db.finishRun(DB, runId, { pagesFetched: 1, listingsSeen: 1, newCount: 1, priceDropCount: 0 });
 
     const [result] = await db.getResults(DB, 's1');

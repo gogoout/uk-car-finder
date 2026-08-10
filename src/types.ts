@@ -3,6 +3,19 @@
 export type Transmission = 'Automatic' | 'Manual';
 
 /**
+ * Filter selections keyed by AutoTrader's own filter names — `make`, `model`,
+ * `aggregated_trim`, `min_price`, `max_mileage`, `fuel_type`, and so on.
+ *
+ * Deliberately an open bag rather than typed fields. AutoTrader's facet API
+ * tells us at runtime which filters exist and what values each accepts, so the
+ * editor renders whatever they support and filters they add later work with no
+ * code change. Values are always arrays because every non-range filter accepts
+ * several values as an OR (`fuel_type: [Petrol, Diesel]` really does return the
+ * union).
+ */
+export type FilterSelections = Record<string, string[]>;
+
+/**
  * One search combination, e.g. "MINI Cooper 1.5 Auto, 2015+, <85k, £5.5-7k".
  * A saved search holds several of these and merges their results.
  */
@@ -11,20 +24,51 @@ export interface Combo {
   id: string;
   /** Human label shown on result cards, e.g. "MINI Cooper 1.5 Auto". */
   label: string;
-  make: string;
-  model?: string;
-  minYear?: number;
-  maxYear?: number;
-  /** Engine size in litres, e.g. 1.4 - 1.6 to catch "1.5" variants. */
-  minEngineLitres?: number;
-  maxEngineLitres?: number;
-  maxMileage?: number;
-  minPrice?: number;
-  maxPrice?: number;
-  transmission?: Transmission;
-  /** Ask AutoTrader to exclude write-offs. Per-listing checks apply regardless. */
-  excludeWriteOffs?: boolean;
+  /**
+   * True once you have typed your own label, so later filter changes stop
+   * regenerating it from make/model/variant and overwriting your wording.
+   */
+  labelIsCustom?: boolean;
+  filters: FilterSelections;
 }
+
+/** Filter names this app reads directly, rather than just passing through. */
+export const FILTER = {
+  make: 'make',
+  model: 'model',
+  variant: 'aggregated_trim',
+  minYear: 'min_year_manufactured',
+  maxYear: 'max_year_manufactured',
+  minPrice: 'min_price',
+  maxPrice: 'max_price',
+  minMileage: 'min_mileage',
+  maxMileage: 'max_mileage',
+  minEngine: 'min_engine_size',
+  maxEngine: 'max_engine_size',
+  transmission: 'transmission',
+  fuelType: 'fuel_type',
+  bodyType: 'body_type',
+  doors: 'doors_values',
+  writeOff: 'is_writeoff',
+  postcode: 'postcode',
+  distance: 'distance',
+  priceSearchType: 'price_search_type',
+} as const;
+
+/** First selected value for a filter, or undefined. */
+export function filterValue(combo: Combo, name: string): string | undefined {
+  return combo.filters[name]?.[0];
+}
+
+/** First selected value parsed as a number, or undefined if absent/unparseable. */
+export function filterNumber(combo: Combo, name: string): number | undefined {
+  const raw = filterValue(combo, name);
+  if (raw === undefined || raw === '') return undefined;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+export const filterValues = (combo: Combo, name: string): string[] => combo.filters[name] ?? [];
 
 export interface SavedSearch {
   id: string;

@@ -14,6 +14,7 @@ import { searchAll } from '../src/autotrader/search';
 import { fetchDetailPage } from '../src/autotrader/gateway';
 import { extractAdvert } from '../src/autotrader/detail';
 import { normaliseAdvert } from '../src/autotrader/normalise';
+import { fetchFacets } from '../src/autotrader/facets';
 import type { Combo } from '../src/types';
 
 const POSTCODE = process.env.SMOKE_POSTCODE ?? 'SW1A 1AA';
@@ -22,29 +23,33 @@ const COMBOS: Combo[] = [
   {
     id: 'mini',
     label: 'MINI Cooper 1.5 Auto',
-    make: 'MINI',
-    model: 'Cooper',
-    minYear: 2015,
-    maxYear: 2016,
-    minEngineLitres: 1.4,
-    maxEngineLitres: 1.6,
-    maxMileage: 85000,
-    minPrice: 5500,
-    maxPrice: 7000,
-    transmission: 'Automatic',
+    filters: {
+      make: ['MINI'],
+      model: ['Cooper'],
+      min_year_manufactured: ['2015'],
+      max_year_manufactured: ['2016'],
+      min_engine_size: ['1.4'],
+      max_engine_size: ['1.6'],
+      max_mileage: ['85000'],
+      min_price: ['5500'],
+      max_price: ['7000'],
+      transmission: ['Automatic'],
+    },
   },
   {
     id: 'mazda',
     label: 'Mazda2 1.5 Skyactiv-G Auto',
-    make: 'MAZDA',
-    model: 'Mazda2',
-    minYear: 2015,
-    minEngineLitres: 1.4,
-    maxEngineLitres: 1.6,
-    maxMileage: 80000,
-    minPrice: 6000,
-    maxPrice: 8000,
-    transmission: 'Automatic',
+    filters: {
+      make: ['MAZDA'],
+      model: ['Mazda2'],
+      min_year_manufactured: ['2015'],
+      min_engine_size: ['1.4'],
+      max_engine_size: ['1.6'],
+      max_mileage: ['80000'],
+      min_price: ['6000'],
+      max_price: ['8000'],
+      transmission: ['Automatic'],
+    },
   },
 ];
 
@@ -55,9 +60,46 @@ function check(condition: boolean, message: string): void {
   if (!condition) failures++;
 }
 
+/**
+ * The filter editor is entirely driven by these, so a change here breaks the UI
+ * far more visibly than a change to the search query.
+ */
+async function checkFacetCascade(): Promise<void> {
+  console.log('\nFacet cascade');
+
+  const optionsFor = (data: Awaited<ReturnType<typeof fetchFacets>>, facet: string): number =>
+    data.facets[facet]?.filters[0]?.options.length ?? 0;
+
+  const empty = await fetchFacets([]);
+  check(empty.groups.length > 0, `facet groups returned (${empty.groups.length})`);
+  check(optionsFor(empty, 'make') > 50, `make list populated (${optionsFor(empty, 'make')})`);
+  check(optionsFor(empty, 'model') === 0, 'model is empty until a make is chosen');
+
+  const withMake = await fetchFacets([{ filter: 'make', selected: ['MINI'] }]);
+  check(optionsFor(withMake, 'model') > 0, `MINI unlocks models (${optionsFor(withMake, 'model')})`);
+
+  const withModel = await fetchFacets([
+    { filter: 'make', selected: ['MINI'] },
+    { filter: 'model', selected: ['Cooper'] },
+  ]);
+  check(
+    optionsFor(withModel, 'aggregated_trim') > 0,
+    `MINI Cooper unlocks variants (${optionsFor(withModel, 'aggregated_trim')})`,
+  );
+
+  // Ranges must arrive as min/max pairs, or the editor renders them wrongly.
+  const price = withModel.facets.price?.filters.map((f) => f.filter) ?? [];
+  check(
+    price.includes('min_price') && price.includes('max_price'),
+    `price is a min/max pair (${price.join(', ')})`,
+  );
+}
+
 async function main(): Promise<void> {
   let sampleAdvertId: string | null = null;
   let combosWithResults = 0;
+
+  await checkFacetCascade();
 
   for (const combo of COMBOS) {
     console.log(`\n${combo.label}`);

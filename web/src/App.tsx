@@ -142,7 +142,7 @@ function Home({ navigate }: { navigate: (path: string, route: Route) => void }) 
             <div className="badges" style={{ marginTop: 8 }}>
               {search.combos.map((combo) => (
                 <span key={combo.id} className="badge combo">
-                  {combo.label || combo.make}
+                  {combo.label || combo.filters.make?.join(', ') || 'Untitled'}
                 </span>
               ))}
             </div>

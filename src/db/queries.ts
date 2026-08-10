@@ -10,8 +10,16 @@ import type {
   SavedSearch,
   SearchListing,
 } from '../types';
+import { migrateCombos } from './migrateCombo';
 
 const now = () => new Date().toISOString();
+
+/**
+ * Combo labels are aggregated with GROUP_CONCAT. The default separator is a
+ * comma, which a label like "MINI Cooper, Clubman" would split on and corrupt.
+ * A unit separator cannot occur in a label typed by a human.
+ */
+const LABEL_SEPARATOR = '\x1f';
 
 /* ------------------------------------------------------------------ searches */
 
@@ -32,7 +40,9 @@ function toSavedSearch(row: SearchRow): SavedSearch {
     name: row.name,
     postcode: row.postcode,
     radius: row.radius === 'national' ? 'national' : Number(row.radius),
-    combos: JSON.parse(row.combos_json) as Combo[],
+    // Combos saved before filters became an open bag are converted on read;
+    // the column is a JSON blob, so there is no SQL migration to run.
+    combos: migrateCombos(JSON.parse(row.combos_json)),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     lastRunAt: row.last_run_at,
@@ -469,7 +479,10 @@ export async function getResults(
   const { results } = await db
     .prepare(
       `SELECT l.*,
-              GROUP_CONCAT(DISTINCT sl.combo_label) AS combo_labels,
+              -- SQLite rejects GROUP_CONCAT(DISTINCT x, sep), so concatenate
+              -- with the separator and dedupe in JS. A listing matches only a
+              -- handful of combos, so the duplicates are trivial.
+              GROUP_CONCAT(sl.combo_label, '${LABEL_SEPARATOR}') AS combo_labels,
               MIN(sl.first_seen_run_id) AS first_seen_run_id,
               (SELECT MAX(price) FROM listing_prices p WHERE p.advert_id = l.advert_id) AS high_price,
               (SELECT COUNT(*) FROM starred s WHERE s.advert_id = l.advert_id) AS starred
@@ -518,7 +531,9 @@ export async function getResults(
       sellerType: row.seller_type,
       location: row.location,
       imageUrl: row.image_url,
-      matchedCombos: row.combo_labels ? row.combo_labels.split(',') : [],
+      matchedCombos: row.combo_labels
+        ? [...new Set(row.combo_labels.split(LABEL_SEPARATOR))].filter(Boolean)
+        : [],
       firstSeenAt: row.first_seen_at,
       lastSeenAt: row.last_seen_at,
       detailFetchedAt: row.detail_fetched_at,

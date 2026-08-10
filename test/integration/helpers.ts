@@ -2,6 +2,7 @@ import { env } from 'cloudflare:test';
 // Tests execute inside workerd, where there is no filesystem — Vite inlines the
 // migration at build time instead.
 import MIGRATION from '../../migrations/0001_init.sql?raw';
+import MIGRATION_2 from '../../migrations/0002_facet_cache.sql?raw';
 import type { Combo, SavedSearch, SearchListing } from '../../src/types';
 
 // The pool types `env` as `Cloudflare.Env`; declare the bindings our tests use.
@@ -22,11 +23,13 @@ const TABLES = [
   'fetch_queue',
   'starred',
   'mot_history',
+  'facet_cache',
 ];
 
 /** Applies the migration and empties every table, so each test starts clean. */
 export async function resetDb(): Promise<D1Database> {
-  const statements = MIGRATION
+  const statements = [MIGRATION, MIGRATION_2]
+    .join(';\n')
     // Strip `--` comments first, or a comment-only tail parses as a statement.
     .replace(/^\s*--.*$/gm, '')
     .split(';')
@@ -42,11 +45,10 @@ export async function resetDb(): Promise<D1Database> {
   return env.DB;
 }
 
-export const combo = (overrides: Partial<Combo> = {}): Combo => ({
+export const combo = (filters: Record<string, string[]> = {}, overrides: Partial<Combo> = {}): Combo => ({
   id: 'c1',
   label: 'MINI Cooper 1.5 Auto',
-  make: 'MINI',
-  model: 'Cooper',
+  filters: { make: ['MINI'], model: ['Cooper'], ...filters },
   ...overrides,
 });
 
