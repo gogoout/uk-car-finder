@@ -118,6 +118,9 @@ function parseSearchBody(body: any, id: string): Omit<SavedSearch, 'createdAt' |
     name: String(body?.name ?? '').trim() || 'Untitled search',
     postcode,
     radius,
+    // Reuses the same generic validator as a combination's bag — the keys are
+    // AutoTrader's filter names either way.
+    globalFilters: parseFilters(body?.globalFilters, 0),
     combos: parseCombos(body?.combos),
   };
 }
@@ -211,12 +214,14 @@ app.get('/api/searches/:id/results', async (c) => {
 
   const results = await db.getResults(c.env.DB, id, {
     excludeWriteOffs: c.req.query('excludeWriteOffs') === 'true',
+    includeDiscarded: c.req.query('includeDiscarded') === 'true',
   });
 
   return c.json({
     search,
     results,
     pendingDetails: await db.queueDepth(c.env.DB),
+    discardedCount: await db.countDiscarded(c.env.DB, id),
   });
 });
 
@@ -266,6 +271,13 @@ app.get('/api/listings/:advertId/detail', async (c) => {
       gone ? 404 : 502,
     );
   }
+});
+
+/** Rule a car out, hiding it from every search that finds it. */
+app.post('/api/listings/:advertId/discard', async (c) => {
+  const { discarded } = (await c.req.json()) as { discarded?: boolean };
+  await db.setDiscarded(c.env.DB, c.req.param('advertId'), discarded !== false);
+  return c.json({ ok: true });
 });
 
 app.post('/api/listings/:advertId/star', async (c) => {

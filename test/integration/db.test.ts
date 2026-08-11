@@ -361,3 +361,110 @@ describe('starring', () => {
     expect((await db.getResults(DB, 's1'))[0]!.starred).toBe(false);
   });
 });
+
+describe('global filters and discarding', () => {
+  const seed = async (listings: Parameters<typeof searchListing>[0][]) => {
+    const runId = await db.startRun(DB, 's1');
+    for (const overrides of listings) {
+      const listing = searchListing(overrides);
+      await db.upsertSearchListing(DB, listing);
+      await db.recordPrice(DB, listing.advertId, listing.price);
+      await db.linkListingToCombo(DB, 's1', listing.advertId, combo(), runId);
+    }
+    await db.finishRun(DB, runId, {
+      pagesFetched: 1, listingsSeen: listings.length, newCount: listings.length, priceDropCount: 0,
+    });
+  };
+
+  it('round-trips global filters', async () => {
+    await db.upsertSearch(DB, savedSearch({ globalFilters: { max_price: ['8000'] } }));
+    expect((await db.getSearch(DB, 's1'))!.globalFilters).toEqual({ max_price: ['8000'] });
+  });
+
+  it('reads a row written before the column existed as having no globals', async () => {
+    // What the migration actually produces: ALTER TABLE ... NOT NULL DEFAULT
+    // '{}' backfills existing rows, so an insert that never mentions the column
+    // is the faithful stand-in for a pre-migration row.
+    await DB.prepare(
+      `INSERT INTO searches (id, name, postcode, radius, combos_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind('legacy', 'Old search', 'SW1A 1AA', '50', '[]', '2026-01-01', '2026-01-01')
+      .run();
+
+    expect((await db.getSearch(DB, 'legacy'))!.globalFilters).toEqual({});
+  });
+
+  /**
+   * The whole point of read-time verification: tightening a global must take
+   * effect immediately, without waiting for the next refresh.
+   */
+  it('retro-filters stored listings when a global is tightened', async () => {
+    await db.upsertSearch(DB, savedSearch());
+    await seed([{ advertId: 'cheap', price: 6500 }, { advertId: 'dear', price: 7800 }]);
+    expect(await db.getResults(DB, 's1')).toHaveLength(2);
+
+    await db.upsertSearch(DB, savedSearch({ globalFilters: { max_price: ['7000'] } }));
+
+    expect((await db.getResults(DB, 's1')).map((r) => r.advertId)).toEqual(['cheap']);
+  });
+
+  it('lets a combination override a global that would exclude it', async () => {
+    await db.upsertSearch(DB, savedSearch());
+    await seed([{ advertId: 'dear', price: 7800 }]);
+
+    await db.upsertSearch(
+      DB,
+      savedSearch({
+        globalFilters: { max_price: ['7000'] },
+        combos: [combo({ max_price: ['9000'] })],
+      }),
+    );
+
+    expect(await db.getResults(DB, 's1')).toHaveLength(1);
+  });
+
+  it('hides a discarded car, and restores it', async () => {
+    await db.upsertSearch(DB, savedSearch());
+    await seed([{ advertId: '1' }, { advertId: '2' }]);
+
+    await db.setDiscarded(DB, '1', true);
+
+    expect((await db.getResults(DB, 's1')).map((r) => r.advertId)).toEqual(['2']);
+    expect(await db.countDiscarded(DB, 's1')).toBe(1);
+
+    // Visible on request, and flagged so the UI can show it differently.
+    const withDiscarded = await db.getResults(DB, 's1', { includeDiscarded: true });
+    expect(withDiscarded).toHaveLength(2);
+    expect(withDiscarded.find((r) => r.advertId === '1')!.discarded).toBe(true);
+
+    await db.setDiscarded(DB, '1', false);
+    expect(await db.getResults(DB, 's1')).toHaveLength(2);
+  });
+
+  it('hides a discarded car from every search that finds it', async () => {
+    await db.upsertSearch(DB, savedSearch());
+    await db.upsertSearch(DB, savedSearch({ id: 's2', name: 'Other' }));
+    await seed([{ advertId: '1' }]);
+    const runId = await db.startRun(DB, 's2');
+    await db.linkListingToCombo(DB, 's2', '1', combo(), runId);
+    await db.finishRun(DB, runId, { pagesFetched: 1, listingsSeen: 1, newCount: 1, priceDropCount: 0 });
+    expect(await db.getResults(DB, 's2')).toHaveLength(1);
+
+    await db.setDiscarded(DB, '1', true);
+
+    expect(await db.getResults(DB, 's1')).toHaveLength(0);
+    expect(await db.getResults(DB, 's2')).toHaveLength(0);
+  });
+
+  it('keeps a discarded car hidden when it is seen again', async () => {
+    await db.upsertSearch(DB, savedSearch());
+    await seed([{ advertId: '1' }]);
+    await db.setDiscarded(DB, '1', true);
+
+    // A later run re-links the same advert.
+    await seed([{ advertId: '1' }]);
+
+    expect(await db.getResults(DB, 's1')).toHaveLength(0);
+  });
+});

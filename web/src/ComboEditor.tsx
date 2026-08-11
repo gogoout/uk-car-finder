@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, type Combo } from './api';
+import { api, type Combo, type FilterSelections } from './api';
 import { FacetAccordion } from './FacetAccordion';
 import { applyCascade } from '../../src/facetUi';
 import { FILTER } from '../../src/types';
@@ -16,6 +16,7 @@ import type { FacetData } from '../../src/autotrader/facets';
  */
 export function ComboEditor({
   combo,
+  globalFilters,
   postcode,
   radius,
   onChange,
@@ -23,6 +24,8 @@ export function ComboEditor({
   canRemove,
 }: {
   combo: Combo;
+  /** The search's globals, which this combination's own filters override. */
+  globalFilters: FilterSelections;
   postcode: string;
   radius: number | 'national';
   onChange: (combo: Combo) => void;
@@ -47,7 +50,9 @@ export function ComboEditor({
     const id = ++requestId.current;
     setLoading(true);
     api
-      .getFacets(combo.filters, postcode, radius)
+      // Merged, so the result count reflects what this combination will
+      // actually search for rather than its own filters in isolation.
+      .getFacets({ ...globalFilters, ...combo.filters }, postcode, radius)
       .then((data) => {
         if (id !== requestId.current) return;
         setFacets(data);
@@ -60,7 +65,7 @@ export function ComboEditor({
       .finally(() => {
         if (id === requestId.current) setLoading(false);
       });
-  }, [combo.filters, postcode, radius, open]);
+  }, [combo.filters, globalFilters, postcode, radius, open]);
 
   const activeFilterCount = Object.keys(combo.filters).length;
 
@@ -135,7 +140,12 @@ export function ComboEditor({
           {facets && (
             <>
               {loading && <div className="tiny muted">Updating options…</div>}
-              <FacetAccordion data={facets} selections={combo.filters} onChange={setFilter} />
+              <FacetAccordion
+              data={facets}
+              selections={combo.filters}
+              onChange={setFilter}
+              inheritedFilters={globalFilters}
+            />
             </>
           )}
         </div>

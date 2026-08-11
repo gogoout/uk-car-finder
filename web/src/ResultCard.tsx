@@ -16,18 +16,22 @@ export function ResultCard({
   onToggleStar,
   onSetVrm,
   onOpen,
+  onDiscard,
 }: {
   listing: ResultListing;
   onToggleStar: (advertId: string, starred: boolean) => void;
   onSetVrm: (advertId: string, vrm: string) => void;
   onOpen: (advertId: string) => void;
+  onDiscard: (advertId: string, discarded: boolean) => void;
 }) {
   const [vrmDraft, setVrmDraft] = useState(listing.vrm ?? '');
 
   const enriched = listing.detailFetchedAt !== null;
 
   return (
-    <article className={`card listing${listing.isNew ? ' is-new' : ''}`}>
+    <article
+      className={`card listing${listing.isNew ? ' is-new' : ''}${listing.discarded ? ' is-discarded' : ''}`}
+    >
       <div className="listing-head">
         {/* Photo and title both open the full advert — the link out to
             AutoTrader lives inside the modal, so the card has one action. */}
@@ -57,15 +61,25 @@ export function ResultCard({
           </div>
           <div className="listing-sub">{listing.subTitle}</div>
         </div>
-        <button
-          type="button"
-          className="icon"
-          aria-label={listing.starred ? 'Remove from shortlist' : 'Add to shortlist'}
-          aria-pressed={listing.starred}
-          onClick={() => onToggleStar(listing.advertId, !listing.starred)}
-        >
-          {listing.starred ? '★' : '☆'}
-        </button>
+        <div className="listing-actions">
+          <button
+            type="button"
+            className="icon"
+            aria-label={listing.starred ? 'Remove from shortlist' : 'Add to shortlist'}
+            aria-pressed={listing.starred}
+            onClick={() => onToggleStar(listing.advertId, !listing.starred)}
+          >
+            {listing.starred ? '★' : '☆'}
+          </button>
+          <button
+            type="button"
+            className="icon"
+            aria-label={listing.discarded ? 'Restore this car' : 'Discard this car'}
+            onClick={() => onDiscard(listing.advertId, !listing.discarded)}
+          >
+            {listing.discarded ? '↩' : '✕'}
+          </button>
+        </div>
       </div>
 
       <div className="spread">
@@ -109,7 +123,13 @@ export function ResultCard({
         {listing.writeOff === 'UNKNOWN' && enriched && (
           <span className="badge warn">Write-off status unknown</span>
         )}
+        {/* The vehicle check is authoritative. When AutoTrader publishes none,
+            fall back to what the seller wrote — visibly weaker wording, so the
+            two are never mistaken for each other. */}
         {listing.imported === 'FAILED' && <span className="badge warn">Imported</span>}
+        {listing.imported !== 'FAILED' && listing.importMentioned && (
+          <span className="badge">Advert mentions import</span>
+        )}
         {listing.stolen === 'FAILED' && <span className="badge bad">Recorded stolen</span>}
         {listing.scrapped === 'FAILED' && <span className="badge bad">Recorded scrapped</span>}
         {listing.motStatus && <span className="badge">{listing.motStatus}</span>}

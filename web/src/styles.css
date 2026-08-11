@@ -202,6 +202,15 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
 .banner { padding: 10px 12px; border-radius: 10px; background: var(--bad-bg); color: var(--bad); font-size: 14px; margin-bottom: 12px; }
 .banner.info { background: var(--surface-2); color: var(--muted); }
 
+/* Star and discard sit together, top-right of the card. */
+.listing-actions { display: flex; flex-direction: column; gap: 2px; flex: none; }
+
+/* A discarded card is legible but clearly set aside — you only see these when
+   you have deliberately asked to. */
+.listing.is-discarded { opacity: 0.55; border-style: dashed; }
+
+.facet-inherited { color: var(--accent); }
+
 /* ------------------------------------------------------------ detail modal */
 
 .modal-backdrop {

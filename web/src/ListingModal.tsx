@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import { Gallery } from './Gallery';
+import { CopyButton } from './CopyButton';
 import { PRICE_LABELS, priceTone, SERVICE_LABELS, serviceTone } from './format';
 import type { FullDetail } from '../../src/autotrader/fullDetail';
 
@@ -230,9 +231,12 @@ export function ListingModal({ advertId, onClose }: { advertId: string; onClose:
                 </Section>
               )}
 
-              <a className="btn" href={detail.detailUrl} target="_blank" rel="noreferrer">
-                View on AutoTrader ↗
-              </a>
+              <div className="row">
+                <a className="btn" href={detail.detailUrl} target="_blank" rel="noreferrer">
+                  View on AutoTrader ↗
+                </a>
+                <CopyButton value={detail.detailUrl} label="Copy link" />
+              </div>
             </>
           )}
         </div>

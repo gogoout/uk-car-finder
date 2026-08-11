@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, rememberSearchId, type ResultsResponse, type RunRow } from './api';
 import { ResultCard } from './ResultCard';
 import { ListingModal } from './ListingModal';
+import { CopyButton } from './CopyButton';
 import { relativeTime, sortResults, type SortKey } from './format';
 
 const SORTS: { key: SortKey; label: string }[] = [
@@ -24,12 +25,13 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
   const [onlyStarred, setOnlyStarred] = useState(false);
   const [showRuns, setShowRuns] = useState(false);
   const [openAdvertId, setOpenAdvertId] = useState<string | null>(null);
+  const [showDiscarded, setShowDiscarded] = useState(false);
 
   const load = useCallback(async () => {
     try {
       setError(null);
       const [results, runHistory] = await Promise.all([
-        api.getResults(id, excludeWriteOffs),
+        api.getResults(id, excludeWriteOffs, showDiscarded),
         api.getRuns(id),
       ]);
       setData(results);
@@ -39,11 +41,19 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load');
     }
-  }, [id, excludeWriteOffs]);
+  }, [id, excludeWriteOffs, showDiscarded]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Named tab, so several saved searches are distinguishable when pinned.
+  useEffect(() => {
+    if (data?.search.name) document.title = `${data.search.name} · UK Car Finder`;
+    return () => {
+      document.title = 'UK Car Finder';
+    };
+  }, [data?.search.name]);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -59,6 +69,11 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
 
   const toggleStar = async (advertId: string, starred: boolean) => {
     await api.setStarred(advertId, starred);
+    await load();
+  };
+
+  const discard = async (advertId: string, discarded: boolean) => {
+    await api.setDiscarded(advertId, discarded);
     await load();
   };
 
@@ -111,13 +126,7 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
             {refreshing ? 'Refreshing…' : 'Refresh now'}
           </button>
           <button onClick={onEdit}>Edit filters</button>
-          <button
-            onClick={() => {
-              void navigator.clipboard.writeText(`${location.origin}/s/${id}`);
-            }}
-          >
-            Copy share link
-          </button>
+          <CopyButton value={`${location.origin}/s/${id}`} label="Copy share link" />
         </div>
 
         <div className="row">
@@ -151,6 +160,16 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
             />
             <span style={{ margin: 0 }}>Hide write-offs</span>
           </label>
+          {(data.discardedCount > 0 || showDiscarded) && (
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={showDiscarded}
+                onChange={(e) => setShowDiscarded(e.target.checked)}
+              />
+              <span style={{ margin: 0 }}>Discarded ({data.discardedCount})</span>
+            </label>
+          )}
         </div>
       </div>
 
@@ -221,6 +240,7 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
               onToggleStar={toggleStar}
               onSetVrm={saveVrm}
               onOpen={setOpenAdvertId}
+              onDiscard={discard}
             />
           ))}
         </div>

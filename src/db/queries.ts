@@ -3,12 +3,13 @@
  * routes stay readable and testable.
  */
 
-import type {
-  Combo,
-  ListingDetail,
-  ResultListing,
-  SavedSearch,
-  SearchListing,
+import {
+  effectiveCombo,
+  type Combo,
+  type ListingDetail,
+  type ResultListing,
+  type SavedSearch,
+  type SearchListing,
 } from '../types';
 import { migrateCombos } from './migrateCombo';
 import { storedListingMatches } from '../autotrader/match';
@@ -29,6 +30,7 @@ const FIELD_SEPARATOR = '\x1e';
 interface SearchRow {
   id: string;
   name: string;
+  global_filters_json: string | null;
   postcode: string;
   radius: string;
   combos_json: string;
@@ -43,6 +45,8 @@ function toSavedSearch(row: SearchRow): SavedSearch {
     name: row.name,
     postcode: row.postcode,
     radius: row.radius === 'national' ? 'national' : Number(row.radius),
+    // Rows written before global filters existed have no column value.
+    globalFilters: row.global_filters_json ? JSON.parse(row.global_filters_json) : {},
     // Combos saved before filters became an open bag are converted on read;
     // the column is a JSON blob, so there is no SQL migration to run.
     combos: migrateCombos(JSON.parse(row.combos_json)),
@@ -71,13 +75,15 @@ export async function upsertSearch(
   const timestamp = now();
   await db
     .prepare(
-      `INSERT INTO searches (id, name, postcode, radius, combos_json, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO searches
+         (id, name, postcode, radius, combos_json, global_filters_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name,
          postcode = excluded.postcode,
          radius = excluded.radius,
          combos_json = excluded.combos_json,
+         global_filters_json = excluded.global_filters_json,
          updated_at = excluded.updated_at`,
     )
     .bind(
@@ -86,6 +92,7 @@ export async function upsertSearch(
       search.postcode,
       String(search.radius),
       JSON.stringify(search.combos),
+      JSON.stringify(search.globalFilters ?? {}),
       timestamp,
       timestamp,
     )
@@ -206,7 +213,7 @@ export async function applyDetail(
          make = ?, model = ?, engine_litres = ?, transmission = ?, fuel = ?,
          body_type = ?, doors = ?, service_history = ?, last_service_date = ?,
          write_off = ?, stolen = ?, scrapped = ?, imported = ?, mot_status = ?,
-         seller_name = ?, location = ?,
+         seller_name = ?, location = ?, import_mentioned = ?,
          image_url = COALESCE(?, image_url),
          year = COALESCE(?, year),
          mileage = COALESCE(?, mileage),
@@ -234,6 +241,7 @@ export async function applyDetail(
       detail.motStatus,
       detail.sellerName,
       detail.location,
+      detail.importMentioned ? 1 : 0,
       detail.imageUrl,
       detail.year,
       detail.mileage,
@@ -470,11 +478,15 @@ interface ResultRow {
   first_seen_run_id: number | null;
   high_price: number | null;
   starred: number;
+  discarded: number;
+  import_mentioned: number | null;
 }
 
 export interface ResultsOptions {
   /** Hide anything not positively cleared by AutoTrader's write-off check. */
   excludeWriteOffs?: boolean;
+  /** Show the cars you have discarded instead of hiding them. */
+  includeDiscarded?: boolean;
 }
 
 export async function getResults(
@@ -495,7 +507,8 @@ export async function getResults(
                            '${LABEL_SEPARATOR}') AS combo_labels,
               MIN(sl.first_seen_run_id) AS first_seen_run_id,
               (SELECT MAX(price) FROM listing_prices p WHERE p.advert_id = l.advert_id) AS high_price,
-              (SELECT COUNT(*) FROM starred s WHERE s.advert_id = l.advert_id) AS starred
+              (SELECT COUNT(*) FROM starred s WHERE s.advert_id = l.advert_id) AS starred,
+              (SELECT COUNT(*) FROM discarded d WHERE d.advert_id = l.advert_id) AS discarded
        FROM listings l
        JOIN search_listings sl ON sl.advert_id = l.advert_id
        WHERE sl.search_id = ?
@@ -551,6 +564,8 @@ export async function getResults(
       priceDrop,
       previousPrice: priceDrop !== null ? row.high_price : null,
       starred: row.starred > 0,
+      discarded: row.discarded > 0,
+      importMentioned: row.import_mentioned === 1,
       vrm: row.vrm,
     };
   });
@@ -559,7 +574,13 @@ export async function getResults(
   // written when a listing matches and is never revisited, so narrowing a combo
   // would otherwise leave the newly-excluded cars on screen — AutoTrader just
   // stops returning them, and nothing removes the existing link.
-  const combosById = new Map((await getSearch(db, searchId))?.combos.map((c) => [c.id, c]) ?? []);
+  // Globals must be layered on here too: without it, tightening a global would
+  // not retro-filter listings already stored — the same gap that once left
+  // over-priced cars on screen after narrowing a combination.
+  const search = await getSearch(db, searchId);
+  const combosById = new Map(
+    (search?.combos ?? []).map((c) => [c.id, effectiveCombo(c, search?.globalFilters)]),
+  );
 
   const verified: ResultListing[] = [];
   for (const [index, listing] of mapped.entries()) {
@@ -575,6 +596,9 @@ export async function getResults(
       .filter((combo) => storedListingMatches(listing, combo).matches);
 
     if (stillMatching.length === 0) continue;
+    // Discarded cars stay in the database — price history and delta tracking
+    // carry on — they are simply not shown unless asked for.
+    if (listing.discarded && !opts.includeDiscarded) continue;
     // Use the combo's current label rather than the one stored at link time.
     verified.push({ ...listing, matchedCombos: stillMatching.map((c) => c.label) });
   }
@@ -601,6 +625,41 @@ export async function setStarred(
   } else {
     await db.prepare('DELETE FROM starred WHERE advert_id = ?').bind(advertId).run();
   }
+}
+
+/**
+ * Rule a car out. Stored separately from `listings` so the listing and its
+ * price history survive, and the decision can be undone.
+ */
+export async function setDiscarded(
+  db: D1Database,
+  advertId: string,
+  discarded: boolean,
+): Promise<void> {
+  if (discarded) {
+    await db
+      .prepare(
+        'INSERT INTO discarded (advert_id, discarded_at) VALUES (?, ?) ON CONFLICT(advert_id) DO NOTHING',
+      )
+      .bind(advertId, now())
+      .run();
+  } else {
+    await db.prepare('DELETE FROM discarded WHERE advert_id = ?').bind(advertId).run();
+  }
+}
+
+/** How many of a search's results are currently hidden as discarded. */
+export async function countDiscarded(db: D1Database, searchId: string): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(DISTINCT sl.advert_id) AS n
+       FROM search_listings sl
+       JOIN discarded d ON d.advert_id = sl.advert_id
+       WHERE sl.search_id = ?`,
+    )
+    .bind(searchId)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
 }
 
 export async function setVrm(db: D1Database, advertId: string, vrm: string | null): Promise<void> {

@@ -14,16 +14,26 @@ export function FacetAccordion({
   data,
   selections,
   onChange,
+  hideGroups,
+  inheritedFilters,
 }: {
   data: FacetData;
   selections: FilterSelections;
   onChange: (filter: string, values: string[]) => void;
+  /** Group names to omit, e.g. the cascade in the global panel. */
+  hideGroups?: string[];
+  /**
+   * Filters coming from the search's globals. Shown as a hint on groups the
+   * combination has not overridden, so it is clear where a value came from.
+   */
+  inheritedFilters?: FilterSelections;
 }) {
   // Make and model is the one group worth opening by default — it's where
   // every search starts.
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set(['make_and_model']));
 
-  const groups = buildGroups(data);
+  const hidden = new Set(hideGroups ?? []);
+  const groups = buildGroups(data).filter((group) => !hidden.has(group.name));
 
   const toggle = (name: string) =>
     setOpenGroups((current) => {
@@ -40,6 +50,12 @@ export function FacetAccordion({
         const summary = summariseGroup(group, selections);
         const filterNames = groupFilterNames(group);
         const hasSelection = filterNames.some((n) => (selections[n]?.length ?? 0) > 0);
+        // Inherited only where the combination has not set the filter itself.
+        const inherited =
+          inheritedFilters !== undefined &&
+          filterNames.some(
+            (n) => (inheritedFilters[n]?.length ?? 0) > 0 && (selections[n]?.length ?? 0) === 0,
+          );
 
         return (
           <section key={group.name} className={`facet-group${hasSelection ? ' has-selection' : ''}`}>
@@ -53,7 +69,10 @@ export function FacetAccordion({
                 {isOpen ? '▾' : '▸'}
               </span>
               <span className="facet-title">{group.title}</span>
-              <span className="facet-summary tiny muted">{summary}</span>
+              <span className="facet-summary tiny muted">
+                {summary}
+                {inherited && <span className="facet-inherited"> · global</span>}
+              </span>
             </button>
 
             {isOpen && (

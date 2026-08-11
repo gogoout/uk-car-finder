@@ -5,6 +5,59 @@ discovered about AutoTrader that aren't obvious from the code. Newest first.
 
 ---
 
+## 2026-08-11 — Global filters, discard, copy button, favicon, import fallback
+
+**Global filters.** `SavedSearch.globalFilters` applies to every combination,
+with the combination winning where it sets the same filter — so a search shares
+a write-off exclusion and mileage cap while each car keeps its own price range.
+
+The merge lives in one helper, `effectiveCombo`, because it has to happen in
+four places or the feature silently half-works: the filters sent to AutoTrader,
+the ingest matcher, the detail-page unlink check, and — most easily missed —
+the **read-time verification** in `getResults`. Without that last one,
+tightening a global would not retro-filter listings already stored, exactly the
+bug fixed earlier for combinations.
+
+Verified live rather than by assertion alone: with no price filter, 4 results;
+global £7,500, **1**; a combination overriding at £9,000, back to **4** — all
+without a refresh.
+
+A first attempt at that check looked like a failure and wasn't. The seed's
+Mazda2 combination sets its own `max_price`, so the global was correctly
+overridden; the test setup obscured the behaviour rather than the behaviour
+being wrong.
+
+**Discard.** A `discarded` table keyed on `advert_id`, like `starred`, so ruling
+a car out hides it from every search that finds it. The listing row survives, so
+price history and deltas continue, and it stays hidden when re-seen on a later
+run rather than returning as "New".
+
+**Import fallback.** AutoTrader's `IMPORTED` check was already extracted and
+badged — 12 of 12 adverts in a live sample carried it. The gap is adverts with
+no vehicle check at all, so `mentionsImport` reads the advert text
+`normaliseAdvert` already parses, at zero extra requests. Deliberately strict:
+"not imported", "imported parts", "import spec" and "Important:" must all be
+rejected, because a wrong badge here costs a wasted trip. Twelve phrasings are
+pinned in tests.
+
+**Copy button.** Extracted `CopyButton` with real feedback and a fallback for
+insecure contexts, replacing a fire-and-forget `writeText` that reported
+nothing. Confirmed by sampling the label over time — it shows its failure state
+under headless, where clipboard writes are denied, then resets.
+
+**Favicon and title.** An SVG icon in `web/public` (Vite's default `publicDir`,
+which did not exist), plus a document title that follows the view so several
+saved searches are distinguishable when pinned.
+
+### Test-harness note
+
+`ALTER TABLE ADD COLUMN` is not idempotent the way `CREATE TABLE IF NOT EXISTS`
+is, and the integration helper re-applies every migration before each test
+against a shared database. It now tolerates "duplicate column name" and nothing
+else. Real deployments apply each migration once.
+
+---
+
 ## 2026-08-11 — Continuous deployment, and a binding rename that would have broken production
 
 `.github/workflows/ci.yml`: `verify` on every PR and push, `deploy` on `main`
