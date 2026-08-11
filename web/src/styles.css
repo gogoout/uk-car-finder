@@ -139,6 +139,45 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
   border-bottom: 1px solid var(--border);
 }
 
+/* Actions, sort and the filter menu on one line. The sort takes the slack so
+   the icons stay a fixed, tappable size. */
+.toolbar-row { display: flex; align-items: center; gap: 6px; }
+.toolbar-sort {
+  flex: 1;
+  min-width: 0;
+  /* Slimmer than a form field — it sits among 44px icon buttons. */
+  min-height: var(--tap);
+  padding: 0 8px;
+  font-size: 14px;
+}
+
+/* Turns while a refresh is in flight, so the icon still says "working". */
+.spin { display: inline-block; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; opacity: 0.6; } }
+
+.filter-menu { position: relative; flex: none; }
+.filter-menu .icon.has-active { border-color: var(--accent); color: var(--accent); }
+.filter-menu-count {
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.filter-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 10;
+  min-width: 200px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+.filter-menu-item + .filter-menu-item { border-top: 1px solid var(--border); }
+
 .checkbox { display: flex; align-items: center; gap: 8px; min-height: var(--tap); }
 .checkbox input { width: 20px; height: 20px; min-height: 0; flex: none; }
 
@@ -203,7 +242,16 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
 .banner.info { background: var(--surface-2); color: var(--muted); }
 
 /* Star and discard sit together, top-right of the card. */
-.listing-actions { display: flex; flex-direction: column; gap: 2px; flex: none; }
+.listing-actions { display: flex; flex-direction: column; gap: 0; flex: none; }
+/* Keep the 44px touch target, but drop the button chrome — two bordered blocks
+   stacked beside the title read as heavier than the title itself. */
+.listing-actions .icon {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 17px;
+}
+.listing-actions .icon[aria-pressed='true'] { color: var(--accent); }
 
 /* A discarded card is legible but clearly set aside — you only see these when
    you have deliberately asked to. */

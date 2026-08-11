@@ -235,7 +235,7 @@ export function ListingModal({ advertId, onClose }: { advertId: string; onClose:
                 <a className="btn" href={detail.detailUrl} target="_blank" rel="noreferrer">
                   View on AutoTrader ↗
                 </a>
-                <CopyButton value={detail.detailUrl} label="Copy link" />
+                <CopyButton value={detail.detailUrl} label="Copy link" copiedLabel="Copied ✓" />
               </div>
             </>
           )}

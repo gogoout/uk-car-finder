@@ -12,14 +12,20 @@ export function CopyButton({
   value,
   label = 'Copy',
   copiedLabel = 'Copied',
+  failedLabel = 'Press ⌘C',
   className = '',
   title,
+  ariaLabel,
 }: {
   value: string;
   label?: string;
   copiedLabel?: string;
+  /** Shown when the clipboard refuses. Keep it short for an icon button. */
+  failedLabel?: string;
   className?: string;
   title?: string;
+  /** Needed when the label is an icon, which reads as nothing to a screen reader. */
+  ariaLabel?: string;
 }) {
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
 
@@ -56,10 +62,11 @@ export function CopyButton({
       type="button"
       className={className}
       title={title ?? value}
+      aria-label={ariaLabel}
       aria-live="polite"
       onClick={copy}
     >
-      {state === 'copied' ? `${copiedLabel} ✓` : state === 'failed' ? 'Press ⌘C' : label}
+      {state === 'copied' ? copiedLabel : state === 'failed' ? failedLabel : label}
     </button>
   );
 }

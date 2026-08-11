@@ -49,6 +49,26 @@ under headless, where clipboard writes are denied, then resets.
 which did not exist), plus a document title that follows the view so several
 saved searches are distinguishable when pinned.
 
+### Follow-up: the results toolbar took three lines
+
+Review feedback. Actions, sort and four checkboxes stacked to roughly 180px
+before a single car was visible on a phone.
+
+Now one row at **61px**: the actions are icon buttons (with `aria-label` and
+`title`, since an icon reads as nothing to a screen reader), the sort sits
+inline taking the leftover width, and the toggles moved behind a menu button
+that carries a count badge — they are off most of the time, so the count is
+enough to show at a glance that something is filtering.
+
+The star and discard buttons on each card lost their button chrome at the same
+time. Two bordered blocks stacked beside the title read heavier than the title;
+they keep the 44px touch target but are now plain icons.
+
+Two test artifacts worth remembering, both the same trap: `agent-browser`'s
+`--name` matches on substring, so clicking "Filters" hit **"Edit filters"** and
+navigated away, and earlier clicking "Make" hit the "Make and model" accordion
+header. Target by class or ref when names overlap.
+
 ### Test-harness note
 
 `ALTER TABLE ADD COLUMN` is not idempotent the way `CREATE TABLE IF NOT EXISTS`
