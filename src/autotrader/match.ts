@@ -228,7 +228,7 @@ export function storedListingMatches(listing: ResultListing, combo: Combo): Matc
     location: listing.location,
     imageUrl: listing.imageUrl,
     vrm: listing.vrm,
-    importMentioned: listing.importMentioned ?? false,
+    advertText: null,
   };
 
   return detailMatchesCombo(asDetail, combo);

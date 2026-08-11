@@ -7,6 +7,7 @@ import { fetchFacets } from './autotrader/facets';
 import { fetchDetailPage } from './autotrader/gateway';
 import { extractAdvert } from './autotrader/detail';
 import { normaliseFullDetail } from './autotrader/fullDetail';
+import { normaliseAdvert } from './autotrader/normalise';
 import { getFacets, pruneFacetCache } from './db/facetCache';
 import { searchLevelFilters, type FilterInput } from './autotrader/filters';
 import { FILTER, type Combo, type FilterSelections, type SavedSearch } from './types';
@@ -248,6 +249,13 @@ app.post('/api/searches/:id/refresh', async (c) => {
  * Fetched live rather than stored: photos, price and availability all change,
  * and keeping ~200KB per listing for the few you actually open would bloat D1
  * for nothing. One request per open, which is user-initiated and rare.
+ *
+ * That same response is also the freshest view of the fields we *do* store, so
+ * it is written back. Opening a car therefore repairs its stored record —
+ * corrected service history, a changed description, a check AutoTrader has
+ * since published — at no extra request, and with no staleness timer to tune.
+ * Cars you never open keep their existing data, which the 4-hourly search
+ * refresh continues to update for price and mileage.
  */
 app.get('/api/listings/:advertId/detail', async (c) => {
   const advertId = c.req.param('advertId');
@@ -255,7 +263,17 @@ app.get('/api/listings/:advertId/detail', async (c) => {
 
   try {
     const html = await fetchDetailPage(advertId);
-    return c.json(normaliseFullDetail(extractAdvert(html), advertId));
+    const advert = extractAdvert(html);
+
+    // Write-back must never delay or break the response the user is waiting
+    // for: it is a side benefit of the fetch, not the point of it.
+    c.executionCtx.waitUntil(
+      db
+        .applyDetail(c.env.DB, { ...normaliseAdvert(advert), advertId })
+        .catch((err) => console.error('Detail write-back failed', advertId, err)),
+    );
+
+    return c.json(normaliseFullDetail(advert, advertId));
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Could not load this advert';
     // A 404 from AutoTrader means the advert is gone, which is worth saying

@@ -59,7 +59,7 @@ describe('refreshSearch', () => {
     expect((await db.getSearch(DB, 's1'))!.lastRunAt).not.toBeNull();
   });
 
-  it('counts a price drop on the second run and does not re-queue a known listing', async () => {
+  it('counts a price drop and re-queues that listing so its detail is re-read', async () => {
     const search = savedSearch();
     await db.upsertSearch(DB, search);
 
@@ -76,7 +76,10 @@ describe('refreshSearch', () => {
 
     expect(second.newCount).toBe(0);
     expect(second.priceDropCount).toBe(1);
-    expect(await db.queueDepth(DB)).toBe(0);
+    // A price move means the seller edited the advert, so whatever else they
+    // changed is worth re-reading. For cars nobody opens, this is the only
+    // thing that refreshes stored detail.
+    expect(await db.queueDepth(DB)).toBe(1);
 
     const [result] = await db.getResults(DB, 's1');
     expect(result!.price).toBe(6500);

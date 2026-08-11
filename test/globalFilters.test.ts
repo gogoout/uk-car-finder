@@ -82,7 +82,6 @@ describe('precedence through buildFilters', () => {
  * the matches.
  */
 describe('mentionsImport', () => {
-  const advert = (text: string) => ({ description: { text: [text] } });
 
   it.each([
     'Japanese import, low mileage',
@@ -90,7 +89,7 @@ describe('mentionsImport', () => {
     'Grey imported vehicle, excellent condition',
     'Imported 2016 model',
   ])('detects %s', (text) => {
-    expect(mentionsImport(advert(text))).toBe(true);
+    expect(mentionsImport(text)).toBe(true);
   });
 
   it.each([
@@ -102,15 +101,12 @@ describe('mentionsImport', () => {
     ['spec rather than the car', 'Import spec alloys'],
     ['a word that merely starts the same', 'Important: MOT due soon'],
   ])('rejects %s', (_label, text) => {
-    expect(mentionsImport(advert(text))).toBe(false);
+    expect(mentionsImport(text)).toBe(false);
   });
 
-  it('reads the attention grabber and subtitle too', () => {
-    expect(mentionsImport({ overviewV2: { attentionGrabber: 'Japanese import' } })).toBe(true);
-    expect(mentionsImport({ heading: { subTitle: '1.5 Auto import' } })).toBe(true);
-  });
-
-  it('does not throw on an advert with no text at all', () => {
-    expect(mentionsImport({})).toBe(false);
+  it('handles an advert with no text at all', () => {
+    expect(mentionsImport(null)).toBe(false);
+    expect(mentionsImport('')).toBe(false);
+    expect(mentionsImport(undefined)).toBe(false);
   });
 });

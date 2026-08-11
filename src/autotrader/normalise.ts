@@ -93,6 +93,28 @@ function firstNumber(...values: unknown[]): number | null {
   return null;
 }
 
+/** Roughly the longest advert text worth keeping; the tail is boilerplate. */
+const MAX_ADVERT_TEXT = 8000;
+
+/**
+ * The seller's own words, as one string: description, attention grabber and
+ * subtitle. Stored so anything derived from the advert's wording can be
+ * recomputed later without re-fetching the page.
+ */
+export function advertText(advert: RawAdvert): string | null {
+  const text = [
+    ...(advert.description?.text ?? []),
+    advert.overviewV2?.attentionGrabber ?? '',
+    advert.heading?.subTitle ?? '',
+  ]
+    .filter((part: unknown): part is string => typeof part === 'string')
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return text ? text.slice(0, MAX_ADVERT_TEXT) : null;
+}
+
 /** Words that flip the meaning when they appear just before "import". */
 const NEGATIONS = /\b(not|never|non|no|isn'?t|wasn'?t)\b/i;
 /** Nouns that make "import" describe a component rather than the car. */
@@ -101,19 +123,18 @@ const NOT_THE_CAR = /^\s*(parts?|spec\b|specification|components?|panels?|wheels
 /**
  * Whether the advert's own words claim the car is an import.
  *
+ * Takes the text rather than the advert, so it can run against the stored
+ * `advert_text` at read time. That is the point: the flag is derived, never
+ * persisted, so changing this pattern takes effect on every listing at once
+ * instead of leaving old rows holding a stale answer.
+ *
  * Only consulted when AutoTrader publishes no vehicle check. Deliberately
  * strict: a wrong badge here costs a wasted trip across the country, so
  * "imported parts", "import spec alloys" and "not imported" must all be
  * rejected. Anything looser is worse than showing nothing.
  */
-export function mentionsImport(advert: RawAdvert): boolean {
-  const text = [
-    ...(advert.description?.text ?? []),
-    advert.overviewV2?.attentionGrabber ?? '',
-    advert.heading?.subTitle ?? '',
-  ]
-    .filter((part: unknown): part is string => typeof part === 'string')
-    .join(' ');
+export function mentionsImport(text: string | null | undefined): boolean {
+  if (!text) return false;
 
   for (const match of text.matchAll(/\bimport(ed|s)?\b/gi)) {
     const index = match.index ?? 0;
@@ -196,6 +217,6 @@ export function normaliseAdvert(advert: RawAdvert): ListingDetail {
     location: sellerLocation(advert),
     imageUrl: advert.pageMetaData?.mainImageUrl ?? null,
     vrm: extractVrm(advert),
-    importMentioned: mentionsImport(advert),
+    advertText: advertText(advert),
   };
 }

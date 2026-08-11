@@ -166,10 +166,11 @@ export interface ListingDetail {
   /** Opportunistically recovered from dealer deep-links; usually null. */
   vrm: string | null;
   /**
-   * The advert's own text mentions the car being an import. Only meaningful
-   * when `imported` is UNKNOWN — the vehicle check is the real signal.
+   * The seller's own words. Stored so anything derived from the advert's
+   * wording — the import hint, and whatever else later — can be recomputed
+   * without re-fetching the page.
    */
-  importMentioned: boolean;
+  advertText: string | null;
 }
 
 /**
@@ -207,5 +208,10 @@ export interface ResultListing
   starred: boolean;
   /** Ruled out by you; hidden from results unless you ask to see them. */
   discarded: boolean;
+  /**
+   * Derived from `advertText` on read, never stored — so changing the detection
+   * applies to every listing at once.
+   */
+  importMentioned: boolean;
   vrm: string | null;
 }

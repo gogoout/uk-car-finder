@@ -80,10 +80,16 @@ export function expandImageUrl(url: string, width: number): string {
   return url.replace('{resize}', `w${width}`);
 }
 
+/**
+ * Fallback wording only. AutoTrader phrases each check as a statement of the
+ * finding — "Not recorded as stolen", "Imported from another country" — which
+ * is far clearer than a bare noun plus a status, so their label wins whenever
+ * they send one.
+ */
 const CHECK_LABELS: Record<string, string> = {
   STOLEN: 'Stolen',
   SCRAPPED: 'Scrapped',
-  IMPORTED: 'Imported',
+  IMPORTED: 'Imported from another country',
   EXPORTED: 'Exported',
   WRITE_OFF: 'Written off',
 };
@@ -160,7 +166,10 @@ function historyChecks(advert: RawAdvert): HistoryCheck[] {
     .filter((check: any) => typeof check?.id === 'string')
     .map((check: any) => ({
       id: check.id as string,
-      label: CHECK_LABELS[check.id as string] ?? String(check.label ?? check.id),
+      // Their label states the finding; ours is only used if they send none.
+      label: typeof check.label === 'string' && check.label
+        ? check.label
+        : (CHECK_LABELS[check.id as string] ?? String(check.id)),
       status: asCheckStatus(check.status),
     }));
 }

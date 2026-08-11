@@ -63,7 +63,13 @@ export async function refreshSearch(
         const isNewListing = await db.upsertSearchListing(database, listing);
         if (isNewListing) newCount++;
 
-        if (await db.recordPrice(database, listing.advertId, listing.price)) priceDropCount++;
+        if (await db.recordPrice(database, listing.advertId, listing.price)) {
+          priceDropCount++;
+          // A price move means the seller touched the advert, so whatever else
+          // they changed is worth re-reading — for cars nobody opens, this is
+          // the only thing that refreshes stored detail.
+          await db.enqueueDetail(database, listing.advertId);
+        }
 
         await db.linkListingToCombo(database, search.id, listing.advertId, combo, runId);
 
