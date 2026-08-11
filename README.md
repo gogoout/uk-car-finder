@@ -44,9 +44,21 @@ pnpm run deploy
 > match the database. Keep it as `DB` — that is what `src/index.ts` reads. A
 > renamed binding still deploys cleanly and then fails on every request.
 
-Then protect it: in the Cloudflare dashboard go to your Worker →
-**Settings → Domains & Routes → Enable Cloudflare Access**. No custom domain
-needed, and no auth code in the app.
+### Domains and access
+
+The Worker serves only from a custom domain, which sits behind Cloudflare Access
+(Google sign-in). Both are configured in the dashboard, deliberately — the
+hostname is not in this repo.
+
+`wrangler.jsonc` sets `workers_dev: false` and `preview_urls: false`. Both
+default to **true**, so omitting them means every deploy re-creates a
+`*.workers.dev` URL that answers *without* going through Access. There is no
+`routes` key either: wrangler overrides dashboard-configured routes with
+whatever the config declares, and per Cloudflare's docs the way to keep routes
+dashboard-managed is to omit the keys entirely and set `workers_dev: false`.
+
+Cron triggers are unaffected by Access — they invoke the Worker directly rather
+than over HTTP, so the scheduled refresh keeps running.
 
 ### Continuous deployment
 
