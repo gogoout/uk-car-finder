@@ -5,6 +5,55 @@ discovered about AutoTrader that aren't obvious from the code. Newest first.
 
 ---
 
+## 2026-08-11 — Import badges, and storing inputs rather than outputs
+
+Two adverts looked wrong and neither actually was:
+
+- A MINI badged "Imported" with nothing about it in the description. AutoTrader's
+  own provenance check says `IMPORTED: FAILED`, labelled *"Imported from another
+  country"* — stronger evidence than the seller's words. It was unfindable in
+  the modal because the check rendered as **"Imported: failed"**, which reads
+  like a broken check rather than a finding. `fullDetail.ts` was overriding
+  AutoTrader's descriptive label with a terse noun; their wording now wins.
+- A Suzuki whose advert says "FRESHLY IMPORTED" and carried no badge. Detection
+  worked; the *storage* didn't.
+
+### The real fault: a derived value was persisted
+
+`import_mentioned` stored the **output** of a regex without its **input**. So
+the flag could not be recomputed: changing the pattern left every existing row
+silently wrong, repairable only by a migration — and again by another one the
+next time the pattern changed. The first attempt at a fix was exactly that
+migration, which was the wrong instinct and was called out as such.
+
+The advert text is now stored (~0.9KB per listing; 0.44MB at 500 cars against
+D1's 5GB) and the flag is derived on read. Changing `mentionsImport` now applies
+everywhere at once. This is the same principle already used for combination
+matching — re-verified at read time rather than cached — which had been got
+right there and violated here.
+
+### Refresh: on observation, not on a timer
+
+The question this exposed was broader: detail data was fetched **once** and
+never again, so a seller's edits were invisible forever.
+
+Rather than a staleness policy, the fix uses a fetch already being made. The
+modal fetches the live page every time it opens, so that response is now written
+back to storage. **Opening a car repairs its stored record** — at no extra
+request, with no timer to tune, and no backfill migration. Verified on both
+reported adverts: opening each populated its data correctly.
+
+For cars nobody opens, a **price change** re-queues the detail, on the reasoning
+that a seller who changed the price probably changed other things too.
+
+### Badges
+
+Solid = AutoTrader's provenance check. Dashed outline, same colour = the
+advert's own words, shown only when they publish no check. Same claim, visibly
+different strength of evidence.
+
+---
+
 ## 2026-08-11 — Global filters, discard, copy button, favicon, import fallback
 
 **Global filters.** `SavedSearch.globalFilters` applies to every combination,

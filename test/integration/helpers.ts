@@ -4,6 +4,7 @@ import { env } from 'cloudflare:test';
 import MIGRATION from '../../migrations/0001_init.sql?raw';
 import MIGRATION_2 from '../../migrations/0002_facet_cache.sql?raw';
 import MIGRATION_3 from '../../migrations/0003_globals_import_discard.sql?raw';
+import MIGRATION_4 from '../../migrations/0004_advert_text.sql?raw';
 import type { Combo, SavedSearch, SearchListing } from '../../src/types';
 
 // The pool types `env` as `Cloudflare.Env`; declare the bindings our tests use.
@@ -30,7 +31,7 @@ const TABLES = [
 
 /** Applies the migration and empties every table, so each test starts clean. */
 export async function resetDb(): Promise<D1Database> {
-  const statements = [MIGRATION, MIGRATION_2, MIGRATION_3]
+  const statements = [MIGRATION, MIGRATION_2, MIGRATION_3, MIGRATION_4]
     .join(';\n')
     // Strip `--` comments first, or a comment-only tail parses as a statement.
     .replace(/^\s*--.*$/gm, '')
@@ -46,7 +47,8 @@ export async function resetDb(): Promise<D1Database> {
       // `CREATE TABLE IF NOT EXISTS` is idempotent; `ALTER TABLE ADD COLUMN` is
       // not, so a repeat run legitimately reports the column already exists.
       // Anything else is a real failure and must still surface.
-      if (!/duplicate column name/i.test(String(err))) throw err;
+      // Same for DROP COLUMN on a column a previous run already removed.
+      if (!/duplicate column name|no such column/i.test(String(err))) throw err;
     }
   }
   for (const table of TABLES) {

@@ -128,12 +128,15 @@ export function ResultCard({
         {listing.writeOff === 'UNKNOWN' && enriched && (
           <span className="badge warn">Write-off status unknown</span>
         )}
-        {/* The vehicle check is authoritative. When AutoTrader publishes none,
-            fall back to what the seller wrote — visibly weaker wording, so the
-            two are never mistaken for each other. */}
+        {/* Solid = AutoTrader's provenance check says so. Dashed = only the
+            seller's own words say so, shown when they publish no check. Same
+            colour because it is the same claim; different border because the
+            evidence is much weaker. */}
         {listing.imported === 'FAILED' && <span className="badge warn">Imported</span>}
         {listing.imported !== 'FAILED' && listing.importMentioned && (
-          <span className="badge">Advert mentions import</span>
+          <span className="badge warn is-suspected" title="The advert text mentions an import; AutoTrader published no vehicle check for this car">
+            Imported?
+          </span>
         )}
         {listing.stolen === 'FAILED' && <span className="badge bad">Recorded stolen</span>}
         {listing.scrapped === 'FAILED' && <span className="badge bad">Recorded scrapped</span>}

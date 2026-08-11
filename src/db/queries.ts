@@ -13,6 +13,7 @@ import {
 } from '../types';
 import { migrateCombos } from './migrateCombo';
 import { storedListingMatches } from '../autotrader/match';
+import { mentionsImport } from '../autotrader/normalise';
 
 const now = () => new Date().toISOString();
 
@@ -213,7 +214,7 @@ export async function applyDetail(
          make = ?, model = ?, engine_litres = ?, transmission = ?, fuel = ?,
          body_type = ?, doors = ?, service_history = ?, last_service_date = ?,
          write_off = ?, stolen = ?, scrapped = ?, imported = ?, mot_status = ?,
-         seller_name = ?, location = ?, import_mentioned = ?,
+         seller_name = ?, location = ?, advert_text = ?,
          image_url = COALESCE(?, image_url),
          year = COALESCE(?, year),
          mileage = COALESCE(?, mileage),
@@ -241,7 +242,7 @@ export async function applyDetail(
       detail.motStatus,
       detail.sellerName,
       detail.location,
-      detail.importMentioned ? 1 : 0,
+      detail.advertText,
       detail.imageUrl,
       detail.year,
       detail.mileage,
@@ -479,7 +480,7 @@ interface ResultRow {
   high_price: number | null;
   starred: number;
   discarded: number;
-  import_mentioned: number | null;
+  advert_text: string | null;
 }
 
 export interface ResultsOptions {
@@ -565,7 +566,10 @@ export async function getResults(
       previousPrice: priceDrop !== null ? row.high_price : null,
       starred: row.starred > 0,
       discarded: row.discarded > 0,
-      importMentioned: row.import_mentioned === 1,
+      // Derived, never stored: changing mentionsImport takes effect on every
+      // listing at once rather than leaving old rows with a stale answer.
+      advertText: row.advert_text,
+      importMentioned: mentionsImport(row.advert_text),
       vrm: row.vrm,
     };
   });

@@ -217,9 +217,14 @@ export function ListingModal({ advertId, onClose }: { advertId: string; onClose:
                       {detail.checks.map((check) => (
                         <span
                           key={check.id}
-                          className={`badge ${check.status === 'FAILED' ? 'bad' : check.status === 'PASSED' ? 'good' : 'warn'}`}
+                          className={`badge ${check.status === 'FAILED' ? 'warn' : check.status === 'PASSED' ? 'good' : ''}`}
                         >
-                          {check.label}: {check.status === 'PASSED' ? 'clear' : check.status.toLowerCase()}
+                          {/* AutoTrader phrases these as assertions ("Not
+                              recorded as stolen", "Imported from another
+                              country"), so show their wording. Rendering
+                              "Imported: failed" made a real finding look like
+                              a broken check. */}
+                          {check.label}
                         </span>
                       ))}
                     </div>

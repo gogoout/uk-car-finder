@@ -205,6 +205,15 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
 .badge.new  { background: var(--new-bg);  color: var(--new); }
 .badge.combo { background: var(--surface-2); color: var(--muted); font-weight: 500; }
 
+/* Same claim, weaker evidence: the advert's own words rather than AutoTrader's
+   provenance check. Dashed outline instead of a solid fill so the difference
+   survives a glance. */
+.badge.is-suspected {
+  background: none;
+  border: 1px dashed currentColor;
+  font-weight: 500;
+}
+
 /* -------------------------------------------------------------- results */
 
 .results { display: grid; gap: 12px; }

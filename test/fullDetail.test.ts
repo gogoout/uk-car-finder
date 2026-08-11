@@ -95,9 +95,23 @@ describe('normaliseFullDetail', () => {
     expect(mazda.motLabel).toContain('17/11/2026');
 
     const byId = Object.fromEntries(mazda.checks.map((c) => [c.id, c]));
-    expect(byId.WRITE_OFF!.label).toBe('Written off');
     expect(byId.IMPORTED!.status).toBe('FAILED');
     expect(byId.STOLEN!.status).toBe('PASSED');
+
+    // AutoTrader phrases each check as the finding itself. Keeping their
+    // wording is the point: rendering "Imported: failed" made a genuine
+    // provenance finding look like a broken check.
+    expect(byId.IMPORTED!.label).toBe('Imported from another country');
+    expect(byId.WRITE_OFF!.label).toBe('Never been written off');
+    expect(byId.STOLEN!.label).toBe('Not recorded as stolen');
+  });
+
+  it('falls back to our own wording only when they send no label', () => {
+    const detail = normaliseFullDetail({
+      history: { vehicleCheck: { basicChecks: [{ id: 'IMPORTED', status: 'FAILED' }] } },
+    });
+
+    expect(detail.checks[0]!.label).toBe('Imported from another country');
   });
 
   it('extracts the seller', () => {
