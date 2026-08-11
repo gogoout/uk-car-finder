@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { expandImageUrl, type GalleryImage } from '../../src/autotrader/fullDetail';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 /** Wide enough for a retina phone without pulling full-resolution originals. */
 const MAIN_WIDTH = 800;
@@ -84,10 +85,10 @@ export function Gallery({ images, alt }: { images: GalleryImage[]; alt: string }
         {count > 1 && (
           <>
             <button type="button" className="gallery-nav prev" aria-label="Previous photo" onClick={() => step(-1)}>
-              ‹
+              <ChevronLeft size={22} aria-hidden="true" />
             </button>
             <button type="button" className="gallery-nav next" aria-label="Next photo" onClick={() => step(1)}>
-              ›
+              <ChevronRight size={22} aria-hidden="true" />
             </button>
           </>
         )}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, type FilterSelections } from './api';
 import { FacetAccordion } from './FacetAccordion';
 import type { FacetData } from '../../src/autotrader/facets';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 /**
  * Filters applied to every combination in the search.
@@ -66,8 +67,8 @@ export function GlobalFilters({
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
-          <span aria-hidden="true" className="facet-caret">
-            {open ? '▾' : '▸'}
+          <span className="facet-caret" aria-hidden="true">
+            {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </span>
           <span className="combo-name">Applies to all combinations</span>
           {count > 0 && (

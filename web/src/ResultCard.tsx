@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ResultListing } from './api';
 import { expandImageUrl } from '../../src/autotrader/fullDetail';
+import { Star, Undo2, X } from 'lucide-react';
 import {
   miles,
   money,
@@ -69,7 +70,7 @@ export function ResultCard({
             aria-pressed={listing.starred}
             onClick={() => onToggleStar(listing.advertId, !listing.starred)}
           >
-            {listing.starred ? '★' : '☆'}
+            <Star size={18} aria-hidden="true" fill={listing.starred ? 'currentColor' : 'none'} />
           </button>
           <button
             type="button"
@@ -77,7 +78,11 @@ export function ResultCard({
             aria-label={listing.discarded ? 'Restore this car' : 'Discard this car'}
             onClick={() => onDiscard(listing.advertId, !listing.discarded)}
           >
-            {listing.discarded ? '↩' : '✕'}
+            {listing.discarded ? (
+              <Undo2 size={18} aria-hidden="true" />
+            ) : (
+              <X size={18} aria-hidden="true" />
+            )}
           </button>
         </div>
       </div>

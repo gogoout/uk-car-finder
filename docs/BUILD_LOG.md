@@ -69,6 +69,21 @@ Two test artifacts worth remembering, both the same trap: `agent-browser`'s
 navigated away, and earlier clicking "Make" hit the "Make and model" accordion
 header. Target by class or ref when names overlap.
 
+### Icons: lucide-react
+
+The first pass used unicode glyphs (⟳ ⚙ ★ ☰). They render from whatever font
+the platform picks, so weights and baselines never matched and some are emoji on
+one OS and line art on another.
+
+Now `lucide-react`: one consistent stroke set, tree-shaken to **+1.7 kB
+gzipped** for the fourteen icons used. Every icon is `aria-hidden`, with the
+accessible name on the button, since an SVG reads as nothing.
+
+Worth noting one thing the swap exposed: "Edit filters" and the results filter
+menu had both landed on the same icon. They do different jobs — one edits the
+search's filter definition, the other filters the visible list — so they now use
+`SlidersHorizontal` and `ListFilter` respectively.
+
 ### Test-harness note
 
 `ALTER TABLE ADD COLUMN` is not idempotent the way `CREATE TABLE IF NOT EXISTS`

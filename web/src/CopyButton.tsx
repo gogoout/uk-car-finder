@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Check, TriangleAlert } from 'lucide-react';
 
 /**
  * Copies text and says so.
@@ -16,6 +17,7 @@ export function CopyButton({
   className = '',
   title,
   ariaLabel,
+  icon,
 }: {
   value: string;
   label?: string;
@@ -24,8 +26,10 @@ export function CopyButton({
   failedLabel?: string;
   className?: string;
   title?: string;
-  /** Needed when the label is an icon, which reads as nothing to a screen reader. */
+  /** Needed when there is no text label, which reads as nothing to a screen reader. */
   ariaLabel?: string;
+  /** Renders as an icon button; the label props are then ignored. */
+  icon?: React.ReactNode;
 }) {
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
 
@@ -66,7 +70,23 @@ export function CopyButton({
       aria-live="polite"
       onClick={copy}
     >
-      {state === 'copied' ? copiedLabel : state === 'failed' ? failedLabel : label}
+      {icon ? (
+        // Icon buttons have no room for words, so the state is shown by
+        // swapping the glyph — a tick, or a warning if the clipboard refused.
+        state === 'copied' ? (
+          <Check size={18} aria-hidden="true" />
+        ) : state === 'failed' ? (
+          <TriangleAlert size={18} aria-hidden="true" />
+        ) : (
+          icon
+        )
+      ) : state === 'copied' ? (
+        copiedLabel
+      ) : state === 'failed' ? (
+        failedLabel
+      ) : (
+        label
+      )}
     </button>
   );
 }

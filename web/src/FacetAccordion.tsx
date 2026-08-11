@@ -3,6 +3,7 @@ import { FacetControl } from './FacetControl';
 import { buildGroups, groupFilterNames, summariseGroup } from '../../src/facetUi';
 import type { FacetData } from '../../src/autotrader/facets';
 import type { FilterSelections } from '../../src/types';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 /**
  * AutoTrader's 27 filter groups, collapsed, in their order — their structure
@@ -65,8 +66,8 @@ export function FacetAccordion({
               aria-expanded={isOpen}
               onClick={() => toggle(group.name)}
             >
-              <span aria-hidden="true" className="facet-caret">
-                {isOpen ? '▾' : '▸'}
+              <span className="facet-caret" aria-hidden="true">
+                {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
               </span>
               <span className="facet-title">{group.title}</span>
               <span className="facet-summary tiny muted">

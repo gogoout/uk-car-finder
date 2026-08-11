@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import type { FacetOption } from '../../src/autotrader/facets';
 
 /**
@@ -71,8 +72,8 @@ export function SearchableSelect({
         }}
       >
         <span className={selected.length ? '' : 'muted'}>{selectedLabels || placeholder}</span>
-        <span aria-hidden="true" className="ss-caret">
-          {open ? '▴' : '▾'}
+        <span className="ss-caret" aria-hidden="true">
+          {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </span>
       </button>
 
@@ -103,7 +104,7 @@ export function SearchableSelect({
                   onClick={() => toggle(option.value)}
                 >
                   <span className="ss-check" aria-hidden="true">
-                    {isSelected ? '✓' : ''}
+                    {isSelected && <Check size={16} />}
                   </span>
                   <span className="ss-label">{option.label}</span>
                   {option.count !== null && (

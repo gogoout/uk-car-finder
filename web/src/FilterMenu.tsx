@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ListFilter } from 'lucide-react';
 
 export interface FilterToggle {
   key: string;
@@ -50,7 +51,8 @@ export function FilterMenu({ toggles }: { toggles: FilterToggle[] }) {
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        ☰{active > 0 && <span className="filter-menu-count">{active}</span>}
+        <ListFilter size={18} aria-hidden="true" />
+        {active > 0 && <span className="filter-menu-count">{active}</span>}
       </button>
 
       {open && (

@@ -4,6 +4,7 @@ import { ResultCard } from './ResultCard';
 import { ListingModal } from './ListingModal';
 import { CopyButton } from './CopyButton';
 import { FilterMenu } from './FilterMenu';
+import { Link2, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { relativeTime, sortResults, type SortKey } from './format';
 
 const SORTS: { key: SortKey; label: string }[] = [
@@ -131,23 +132,19 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
           aria-label={refreshing ? 'Refreshing' : 'Refresh now'}
           title="Refresh now"
         >
-          <span className={refreshing ? 'spin' : ''} aria-hidden="true">
-            ⟳
-          </span>
+          <RefreshCw size={18} className={refreshing ? 'spin' : ''} aria-hidden="true" />
         </button>
 
         <button className="icon" onClick={onEdit} aria-label="Edit filters" title="Edit filters">
-          <span aria-hidden="true">⚙</span>
+          <SlidersHorizontal size={18} aria-hidden="true" />
         </button>
 
         <CopyButton
           value={`${location.origin}/s/${id}`}
-          label="🔗"
-          copiedLabel="✓"
-          failedLabel="⚠"
           className="icon"
           ariaLabel="Copy share link"
           title="Copy share link"
+          icon={<Link2 size={18} aria-hidden="true" />}
         />
 
         <select

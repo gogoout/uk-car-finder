@@ -4,6 +4,7 @@ import { FacetAccordion } from './FacetAccordion';
 import { applyCascade } from '../../src/facetUi';
 import { FILTER } from '../../src/types';
 import type { FacetData } from '../../src/autotrader/facets';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 /**
  * One search combination, e.g. "MINI Cooper 1.5 Auto, 2015-16, under 85k,
@@ -93,8 +94,8 @@ export function ComboEditor({
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
-          <span aria-hidden="true" className="facet-caret">
-            {open ? '▾' : '▸'}
+          <span className="facet-caret" aria-hidden="true">
+            {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </span>
           <span className="combo-name">{combo.label || 'New combination'}</span>
           {!open && activeFilterCount > 0 && (
