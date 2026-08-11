@@ -105,7 +105,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 button.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; font-weight: 600; }
 button.danger { color: var(--bad); }
 button.link { background: none; border: none; min-height: auto; padding: 0; color: var(--accent); text-decoration: underline; }
+/* Icon buttons centre an SVG; line-height and font-size no longer apply. */
 button.icon { min-width: var(--tap); padding: 0; font-size: 20px; line-height: 1; }
+button.icon > svg { display: block; }
 
 input, select {
   width: 100%;
@@ -138,6 +140,46 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
   margin-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
+
+/* Actions, sort and the filter menu on one line. The sort takes the slack so
+   the icons stay a fixed, tappable size. */
+.toolbar-row { display: flex; align-items: center; gap: 6px; }
+.toolbar-sort {
+  flex: 1;
+  min-width: 0;
+  /* Slimmer than a form field — it sits among 44px icon buttons. */
+  min-height: var(--tap);
+  padding: 0 8px;
+  font-size: 14px;
+}
+
+/* Turns while a refresh is in flight, so the icon still says "working". */
+.spin { display: inline-block; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; opacity: 0.6; } }
+
+.filter-menu { position: relative; flex: none; }
+.filter-menu .icon.has-active { border-color: var(--accent); color: var(--accent); }
+.filter-menu .icon { gap: 2px; }
+.filter-menu-count {
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.filter-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 10;
+  min-width: 200px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+.filter-menu-item + .filter-menu-item { border-top: 1px solid var(--border); }
 
 .checkbox { display: flex; align-items: center; gap: 8px; min-height: var(--tap); }
 .checkbox input { width: 20px; height: 20px; min-height: 0; flex: none; }
@@ -201,6 +243,24 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
 
 .banner { padding: 10px 12px; border-radius: 10px; background: var(--bad-bg); color: var(--bad); font-size: 14px; margin-bottom: 12px; }
 .banner.info { background: var(--surface-2); color: var(--muted); }
+
+/* Star and discard sit together, top-right of the card. */
+.listing-actions { display: flex; flex-direction: column; gap: 0; flex: none; }
+/* Keep the 44px touch target, but drop the button chrome — two bordered blocks
+   stacked beside the title read as heavier than the title itself. */
+.listing-actions .icon {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 17px;
+}
+.listing-actions .icon[aria-pressed='true'] { color: var(--accent); }
+
+/* A discarded card is legible but clearly set aside — you only see these when
+   you have deliberately asked to. */
+.listing.is-discarded { opacity: 0.55; border-style: dashed; }
+
+.facet-inherited { color: var(--accent); }
 
 /* ------------------------------------------------------------ detail modal */
 
@@ -286,6 +346,7 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
 }
+.gallery-nav > svg { display: block; }
 .gallery-nav.prev { left: 8px; }
 .gallery-nav.next { right: 8px; }
 
@@ -405,7 +466,8 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
   justify-content: flex-start;
 }
 
-.facet-caret { color: var(--muted); font-size: 12px; width: 12px; flex: none; }
+/* Holds an icon, so centre it rather than sizing it as text. */
+.facet-caret { color: var(--muted); flex: none; display: inline-flex; align-items: center; }
 .facet-title { flex: none; }
 /* The summary takes the remaining width and truncates, so a long selection
    can never push the row into a second line. */
@@ -439,7 +501,7 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
   gap: 8px;
 }
 .ss-trigger > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ss-caret { color: var(--muted); flex: none; }
+.ss-caret { color: var(--muted); flex: none; display: inline-flex; align-items: center; }
 
 .ss-panel {
   margin-top: 6px;
@@ -465,7 +527,7 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
 }
 .ss-option + .ss-option { border-top: 1px solid var(--border); }
 .ss-option.is-selected { background: var(--surface-2); }
-.ss-check { width: 16px; flex: none; color: var(--accent); }
+.ss-check { width: 16px; flex: none; color: var(--accent); display: inline-flex; align-items: center; }
 .ss-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ss-count { flex: none; }
 

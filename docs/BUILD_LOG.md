@@ -5,6 +5,94 @@ discovered about AutoTrader that aren't obvious from the code. Newest first.
 
 ---
 
+## 2026-08-11 — Global filters, discard, copy button, favicon, import fallback
+
+**Global filters.** `SavedSearch.globalFilters` applies to every combination,
+with the combination winning where it sets the same filter — so a search shares
+a write-off exclusion and mileage cap while each car keeps its own price range.
+
+The merge lives in one helper, `effectiveCombo`, because it has to happen in
+four places or the feature silently half-works: the filters sent to AutoTrader,
+the ingest matcher, the detail-page unlink check, and — most easily missed —
+the **read-time verification** in `getResults`. Without that last one,
+tightening a global would not retro-filter listings already stored, exactly the
+bug fixed earlier for combinations.
+
+Verified live rather than by assertion alone: with no price filter, 4 results;
+global £7,500, **1**; a combination overriding at £9,000, back to **4** — all
+without a refresh.
+
+A first attempt at that check looked like a failure and wasn't. The seed's
+Mazda2 combination sets its own `max_price`, so the global was correctly
+overridden; the test setup obscured the behaviour rather than the behaviour
+being wrong.
+
+**Discard.** A `discarded` table keyed on `advert_id`, like `starred`, so ruling
+a car out hides it from every search that finds it. The listing row survives, so
+price history and deltas continue, and it stays hidden when re-seen on a later
+run rather than returning as "New".
+
+**Import fallback.** AutoTrader's `IMPORTED` check was already extracted and
+badged — 12 of 12 adverts in a live sample carried it. The gap is adverts with
+no vehicle check at all, so `mentionsImport` reads the advert text
+`normaliseAdvert` already parses, at zero extra requests. Deliberately strict:
+"not imported", "imported parts", "import spec" and "Important:" must all be
+rejected, because a wrong badge here costs a wasted trip. Twelve phrasings are
+pinned in tests.
+
+**Copy button.** Extracted `CopyButton` with real feedback and a fallback for
+insecure contexts, replacing a fire-and-forget `writeText` that reported
+nothing. Confirmed by sampling the label over time — it shows its failure state
+under headless, where clipboard writes are denied, then resets.
+
+**Favicon and title.** An SVG icon in `web/public` (Vite's default `publicDir`,
+which did not exist), plus a document title that follows the view so several
+saved searches are distinguishable when pinned.
+
+### Follow-up: the results toolbar took three lines
+
+Review feedback. Actions, sort and four checkboxes stacked to roughly 180px
+before a single car was visible on a phone.
+
+Now one row at **61px**: the actions are icon buttons (with `aria-label` and
+`title`, since an icon reads as nothing to a screen reader), the sort sits
+inline taking the leftover width, and the toggles moved behind a menu button
+that carries a count badge — they are off most of the time, so the count is
+enough to show at a glance that something is filtering.
+
+The star and discard buttons on each card lost their button chrome at the same
+time. Two bordered blocks stacked beside the title read heavier than the title;
+they keep the 44px touch target but are now plain icons.
+
+Two test artifacts worth remembering, both the same trap: `agent-browser`'s
+`--name` matches on substring, so clicking "Filters" hit **"Edit filters"** and
+navigated away, and earlier clicking "Make" hit the "Make and model" accordion
+header. Target by class or ref when names overlap.
+
+### Icons: lucide-react
+
+The first pass used unicode glyphs (⟳ ⚙ ★ ☰). They render from whatever font
+the platform picks, so weights and baselines never matched and some are emoji on
+one OS and line art on another.
+
+Now `lucide-react`: one consistent stroke set, tree-shaken to **+1.7 kB
+gzipped** for the fourteen icons used. Every icon is `aria-hidden`, with the
+accessible name on the button, since an SVG reads as nothing.
+
+Worth noting one thing the swap exposed: "Edit filters" and the results filter
+menu had both landed on the same icon. They do different jobs — one edits the
+search's filter definition, the other filters the visible list — so they now use
+`SlidersHorizontal` and `ListFilter` respectively.
+
+### Test-harness note
+
+`ALTER TABLE ADD COLUMN` is not idempotent the way `CREATE TABLE IF NOT EXISTS`
+is, and the integration helper re-applies every migration before each test
+against a shared database. It now tolerates "duplicate column name" and nothing
+else. Real deployments apply each migration once.
+
+---
+
 ## 2026-08-11 — Continuous deployment, and a binding rename that would have broken production
 
 `.github/workflows/ci.yml`: `verify` on every PR and push, `deploy` on `main`

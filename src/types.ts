@@ -70,9 +70,33 @@ export function filterNumber(combo: Combo, name: string): number | undefined {
 
 export const filterValues = (combo: Combo, name: string): string[] => combo.filters[name] ?? [];
 
+/**
+ * A combination as it actually behaves: its own filters layered over the
+ * search's globals.
+ *
+ * Everything that reads a combination's filters must go through this, or the
+ * feature half-works — the filters sent to AutoTrader, both matchers, and the
+ * read-time verification in getResults all need the same merged view.
+ */
+export function effectiveCombo(
+  combo: Combo,
+  globalFilters: FilterSelections | undefined,
+): Combo {
+  if (!globalFilters || Object.keys(globalFilters).length === 0) return combo;
+  // Combo keys last: a combination overrides the global for filters it sets.
+  return { ...combo, filters: { ...globalFilters, ...combo.filters } };
+}
+
 export interface SavedSearch {
   id: string;
   name: string;
+  /**
+   * Filters applied to every combination. A combination that sets the same
+   * filter overrides it, so these behave as defaults rather than constraints —
+   * which is what lets one search share a write-off exclusion and a mileage cap
+   * while each combination keeps its own price range.
+   */
+  globalFilters: FilterSelections;
   postcode: string;
   /** Search radius in miles, or 'national'. */
   radius: number | 'national';
@@ -141,6 +165,11 @@ export interface ListingDetail {
   imageUrl: string | null;
   /** Opportunistically recovered from dealer deep-links; usually null. */
   vrm: string | null;
+  /**
+   * The advert's own text mentions the car being an import. Only meaningful
+   * when `imported` is UNKNOWN — the vehicle check is the real signal.
+   */
+  importMentioned: boolean;
 }
 
 /**
@@ -176,5 +205,7 @@ export interface ResultListing
   priceDrop: number | null;
   previousPrice: number | null;
   starred: boolean;
+  /** Ruled out by you; hidden from results unless you ask to see them. */
+  discarded: boolean;
   vrm: string | null;
 }

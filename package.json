@@ -21,7 +21,8 @@
     "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
-    "hono": "^4.13.1"
+    "hono": "^4.13.1",
+    "lucide-react": "^1.31.0"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.20.3",

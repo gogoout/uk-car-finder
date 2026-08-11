@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import { Gallery } from './Gallery';
+import { CopyButton } from './CopyButton';
 import { PRICE_LABELS, priceTone, SERVICE_LABELS, serviceTone } from './format';
 import type { FullDetail } from '../../src/autotrader/fullDetail';
+import { ChevronDown, ChevronRight, ExternalLink, X } from 'lucide-react';
 
 /** Collapsible section, matching the accordion used by the filter editor. */
 function Section({
@@ -21,8 +23,8 @@ function Section({
   return (
     <section className="facet-group">
       <button type="button" className="facet-head" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        <span aria-hidden="true" className="facet-caret">
-          {open ? '▾' : '▸'}
+        <span className="facet-caret" aria-hidden="true">
+          {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </span>
         <span className="facet-title">{title}</span>
         {count !== undefined && <span className="facet-summary tiny muted">{count}</span>}
@@ -89,7 +91,7 @@ export function ListingModal({ advertId, onClose }: { advertId: string; onClose:
             {detail?.subTitle && <div className="tiny muted">{detail.subTitle}</div>}
           </div>
           <button type="button" className="icon" aria-label="Close" onClick={onClose}>
-            ✕
+            <X size={20} aria-hidden="true" />
           </button>
         </header>
 
@@ -230,9 +232,13 @@ export function ListingModal({ advertId, onClose }: { advertId: string; onClose:
                 </Section>
               )}
 
-              <a className="btn" href={detail.detailUrl} target="_blank" rel="noreferrer">
-                View on AutoTrader ↗
-              </a>
+              <div className="row">
+                <a className="btn" href={detail.detailUrl} target="_blank" rel="noreferrer">
+                  View on AutoTrader
+                  <ExternalLink size={16} aria-hidden="true" />
+                </a>
+                <CopyButton value={detail.detailUrl} label="Copy link" copiedLabel="Copied ✓" />
+              </div>
             </>
           )}
         </div>

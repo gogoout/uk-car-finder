@@ -7,7 +7,7 @@ import { buildFilters } from '../autotrader/filters';
 import { matchesCombo } from '../autotrader/match';
 import { searchAll, type SearchAllOptions } from '../autotrader/search';
 import * as db from '../db/queries';
-import type { SavedSearch } from '../types';
+import { effectiveCombo, type SavedSearch } from '../types';
 
 export interface RefreshResult {
   runId: number;
@@ -35,7 +35,11 @@ export async function refreshSearch(
   let rejectedCount = 0;
   const failures: string[] = [];
 
-  for (const combo of search.combos) {
+  for (const rawCombo of search.combos) {
+    // The search's globals layered under the combination's own filters. Used
+    // for both the request and the verification below, so what we ask for and
+    // what we accept can't drift apart.
+    const combo = effectiveCombo(rawCombo, search.globalFilters);
     const filters = buildFilters(combo, {
       postcode: search.postcode,
       radius: search.radius,

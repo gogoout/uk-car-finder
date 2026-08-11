@@ -4,6 +4,15 @@ import { SearchEditor } from './SearchEditor';
 import { SearchView } from './SearchView';
 import { relativeTime } from './format';
 
+const SITE = 'UK Car Finder';
+
+/** Keeps the tab and history entries distinguishable between views. */
+function useDocumentTitle(title: string | null): void {
+  useEffect(() => {
+    document.title = title ? `${title} · ${SITE}` : SITE;
+  }, [title]);
+}
+
 type Route =
   | { view: 'home' }
   | { view: 'search'; id: string }
@@ -65,6 +74,8 @@ function EditRoute({
       .finally(() => setLoading(false));
   }, [id]);
 
+  useDocumentTitle(existing ? `Edit ${existing.name}` : 'New search');
+
   if (loading) return <div className="empty">Loading…</div>;
 
   return (
@@ -89,6 +100,8 @@ function Home({ navigate }: { navigate: (path: string, route: Route) => void }) 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useDocumentTitle(null);
 
   if (!searches) return <div className="empty">Loading…</div>;
 

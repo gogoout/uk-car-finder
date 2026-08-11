@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="UK Car Finder">
+  <!-- Rounded tile so the icon reads at 16px without a transparent silhouette,
+       which disappears against a dark tab strip. -->
+  <rect width="64" height="64" rx="14" fill="#1f6feb"/>
+  <!-- A car in profile: body, roof, and two wheels. -->
+  <path d="M12 38c0-1.6 1-3 2.6-3.4l3.2-.8 4.6-7.2A6 6 0 0 1 27.5 24h9a6 6 0 0 1 5.1 2.6l4.6 7.2 3.2.8A3.5 3.5 0 0 1 52 38v5a2 2 0 0 1-2 2h-2.2a6 6 0 0 0-11.6 0h-8.4a6 6 0 0 0-11.6 0H14a2 2 0 0 1-2-2z" fill="#ffffff"/>
+  <path d="M27.5 28h9a2 2 0 0 1 1.7.9l3.3 5.1H22.5l3.3-5.1a2 2 0 0 1 1.7-.9z" fill="#1f6feb"/>
+  <circle cx="21.8" cy="45" r="4.2" fill="#ffffff"/>
+  <circle cx="42.2" cy="45" r="4.2" fill="#ffffff"/>
+  <circle cx="21.8" cy="45" r="1.7" fill="#1f6feb"/>
+  <circle cx="42.2" cy="45" r="1.7" fill="#1f6feb"/>
+</svg>

@@ -3,6 +3,7 @@ import { env } from 'cloudflare:test';
 // migration at build time instead.
 import MIGRATION from '../../migrations/0001_init.sql?raw';
 import MIGRATION_2 from '../../migrations/0002_facet_cache.sql?raw';
+import MIGRATION_3 from '../../migrations/0003_globals_import_discard.sql?raw';
 import type { Combo, SavedSearch, SearchListing } from '../../src/types';
 
 // The pool types `env` as `Cloudflare.Env`; declare the bindings our tests use.
@@ -24,11 +25,12 @@ const TABLES = [
   'starred',
   'mot_history',
   'facet_cache',
+  'discarded',
 ];
 
 /** Applies the migration and empties every table, so each test starts clean. */
 export async function resetDb(): Promise<D1Database> {
-  const statements = [MIGRATION, MIGRATION_2]
+  const statements = [MIGRATION, MIGRATION_2, MIGRATION_3]
     .join(';\n')
     // Strip `--` comments first, or a comment-only tail parses as a statement.
     .replace(/^\s*--.*$/gm, '')
@@ -37,7 +39,15 @@ export async function resetDb(): Promise<D1Database> {
     .filter(Boolean);
 
   for (const sql of statements) {
-    await env.DB.prepare(sql).run();
+    try {
+      await env.DB.prepare(sql).run();
+    } catch (err) {
+      // Tests share one database and re-apply the migrations before each case.
+      // `CREATE TABLE IF NOT EXISTS` is idempotent; `ALTER TABLE ADD COLUMN` is
+      // not, so a repeat run legitimately reports the column already exists.
+      // Anything else is a real failure and must still surface.
+      if (!/duplicate column name/i.test(String(err))) throw err;
+    }
   }
   for (const table of TABLES) {
     await env.DB.prepare(`DELETE FROM ${table}`).run();
@@ -55,6 +65,7 @@ export const combo = (filters: Record<string, string[]> = {}, overrides: Partial
 export const savedSearch = (overrides: Partial<SavedSearch> = {}): SavedSearch => ({
   id: 's1',
   name: 'Small autos',
+  globalFilters: {},
   postcode: 'SW1A 1AA',
   radius: 50,
   combos: [combo()],

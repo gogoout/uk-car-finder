@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { api, rememberSearchId, type Combo, type SavedSearch } from './api';
 import { ComboEditor } from './ComboEditor';
+import { GlobalFilters } from './GlobalFilters';
+import type { FilterSelections } from './api';
 
 const newCombo = (): Combo => ({
   id: Math.random().toString(36).slice(2, 8),
@@ -21,6 +23,9 @@ export function SearchEditor({
   const [postcode, setPostcode] = useState(existing?.postcode ?? '');
   const [radius, setRadius] = useState<string>(String(existing?.radius ?? 50));
   const [combos, setCombos] = useState<Combo[]>(existing?.combos ?? [newCombo()]);
+  const [globalFilters, setGlobalFilters] = useState<FilterSelections>(
+    existing?.globalFilters ?? {},
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,6 +50,7 @@ export function SearchEditor({
         name: name.trim() || 'Untitled search',
         postcode: postcode.trim(),
         radius: radius === 'national' ? ('national' as const) : Number(radius),
+        globalFilters,
         combos,
       };
       const saved = existing
@@ -100,6 +106,17 @@ export function SearchEditor({
       </div>
 
       <div style={{ margin: '18px 0 8px' }}>
+        <strong>Filters</strong>
+      </div>
+
+      <GlobalFilters
+        filters={globalFilters}
+        postcode={postcode}
+        radius={radius === 'national' ? 'national' : Number(radius)}
+        onChange={setGlobalFilters}
+      />
+
+      <div style={{ margin: '18px 0 8px' }}>
         <strong>Combinations</strong>
       </div>
 
@@ -107,6 +124,7 @@ export function SearchEditor({
         <ComboEditor
           key={combo.id}
           combo={combo}
+          globalFilters={globalFilters}
           postcode={postcode}
           radius={radius === 'national' ? 'national' : Number(radius)}
           canRemove={combos.length > 1}

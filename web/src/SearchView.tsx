@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, rememberSearchId, type ResultsResponse, type RunRow } from './api';
 import { ResultCard } from './ResultCard';
 import { ListingModal } from './ListingModal';
+import { CopyButton } from './CopyButton';
+import { FilterMenu } from './FilterMenu';
+import { Link2, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { relativeTime, sortResults, type SortKey } from './format';
 
 const SORTS: { key: SortKey; label: string }[] = [
@@ -24,12 +27,13 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
   const [onlyStarred, setOnlyStarred] = useState(false);
   const [showRuns, setShowRuns] = useState(false);
   const [openAdvertId, setOpenAdvertId] = useState<string | null>(null);
+  const [showDiscarded, setShowDiscarded] = useState(false);
 
   const load = useCallback(async () => {
     try {
       setError(null);
       const [results, runHistory] = await Promise.all([
-        api.getResults(id, excludeWriteOffs),
+        api.getResults(id, excludeWriteOffs, showDiscarded),
         api.getRuns(id),
       ]);
       setData(results);
@@ -39,11 +43,19 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load');
     }
-  }, [id, excludeWriteOffs]);
+  }, [id, excludeWriteOffs, showDiscarded]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Named tab, so several saved searches are distinguishable when pinned.
+  useEffect(() => {
+    if (data?.search.name) document.title = `${data.search.name} · UK Car Finder`;
+    return () => {
+      document.title = 'UK Car Finder';
+    };
+  }, [data?.search.name]);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -59,6 +71,11 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
 
   const toggleStar = async (advertId: string, starred: boolean) => {
     await api.setStarred(advertId, starred);
+    await load();
+  };
+
+  const discard = async (advertId: string, discarded: boolean) => {
+    await api.setDiscarded(advertId, discarded);
     await load();
   };
 
@@ -105,53 +122,66 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
         </button>
       </header>
 
-      <div className="toolbar stack">
-        <div className="row">
-          <button className="primary" onClick={refresh} disabled={refreshing}>
-            {refreshing ? 'Refreshing…' : 'Refresh now'}
-          </button>
-          <button onClick={onEdit}>Edit filters</button>
-          <button
-            onClick={() => {
-              void navigator.clipboard.writeText(`${location.origin}/s/${id}`);
-            }}
-          >
-            Copy share link
-          </button>
-        </div>
+      {/* One line: actions as icons, sort inline, and the toggles behind a
+          menu — the checkbox row and a full-width sort pushed this to three. */}
+      <div className="toolbar toolbar-row">
+        <button
+          className="primary icon"
+          onClick={refresh}
+          disabled={refreshing}
+          aria-label={refreshing ? 'Refreshing' : 'Refresh now'}
+          title="Refresh now"
+        >
+          <RefreshCw size={18} className={refreshing ? 'spin' : ''} aria-hidden="true" />
+        </button>
 
-        <div className="row">
-          <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} style={{ flex: 1 }}>
-            {SORTS.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <button className="icon" onClick={onEdit} aria-label="Edit filters" title="Edit filters">
+          <SlidersHorizontal size={18} aria-hidden="true" />
+        </button>
 
-        <div className="row">
-          <label className="checkbox">
-            <input type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} />
-            <span style={{ margin: 0 }}>New ({newCount})</span>
-          </label>
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={onlyStarred}
-              onChange={(e) => setOnlyStarred(e.target.checked)}
-            />
-            <span style={{ margin: 0 }}>Shortlist</span>
-          </label>
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={excludeWriteOffs}
-              onChange={(e) => setExcludeWriteOffs(e.target.checked)}
-            />
-            <span style={{ margin: 0 }}>Hide write-offs</span>
-          </label>
-        </div>
+        <CopyButton
+          value={`${location.origin}/s/${id}`}
+          className="icon"
+          ariaLabel="Copy share link"
+          title="Copy share link"
+          icon={<Link2 size={18} aria-hidden="true" />}
+        />
+
+        <select
+          className="toolbar-sort"
+          aria-label="Sort results"
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortKey)}
+        >
+          {SORTS.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+
+        <FilterMenu
+          toggles={[
+            { key: 'new', label: `New (${newCount})`, checked: onlyNew, onChange: setOnlyNew },
+            { key: 'starred', label: 'Shortlist', checked: onlyStarred, onChange: setOnlyStarred },
+            {
+              key: 'writeoffs',
+              label: 'Hide write-offs',
+              checked: excludeWriteOffs,
+              onChange: setExcludeWriteOffs,
+            },
+            ...(data.discardedCount > 0 || showDiscarded
+              ? [
+                  {
+                    key: 'discarded',
+                    label: `Discarded (${data.discardedCount})`,
+                    checked: showDiscarded,
+                    onChange: setShowDiscarded,
+                  },
+                ]
+              : []),
+          ]}
+        />
       </div>
 
       <div className="small muted" style={{ marginBottom: 10 }}>
@@ -221,6 +251,7 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
               onToggleStar={toggleStar}
               onSetVrm={saveVrm}
               onOpen={setOpenAdvertId}
+              onDiscard={discard}
             />
           ))}
         </div>

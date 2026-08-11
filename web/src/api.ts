@@ -20,6 +20,7 @@ export interface ResultsResponse {
   search: SavedSearch;
   results: ResultListing[];
   pendingDetails: number;
+  discardedCount: number;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -38,6 +39,8 @@ export interface SearchInput {
   name: string;
   postcode: string;
   radius: number | 'national';
+  /** Applied to every combination; a combination's own filters override. */
+  globalFilters: FilterSelections;
   combos: Combo[];
 }
 
@@ -67,9 +70,10 @@ export const api = {
 
   deleteSearch: (id: string) => request<{ ok: true }>(`/api/searches/${id}`, { method: 'DELETE' }),
 
-  getResults: (id: string, excludeWriteOffs: boolean) =>
+  getResults: (id: string, excludeWriteOffs: boolean, includeDiscarded = false) =>
     request<ResultsResponse>(
-      `/api/searches/${id}/results?excludeWriteOffs=${excludeWriteOffs ? 'true' : 'false'}`,
+      `/api/searches/${id}/results?excludeWriteOffs=${excludeWriteOffs ? 'true' : 'false'}` +
+        `&includeDiscarded=${includeDiscarded ? 'true' : 'false'}`,
     ),
 
   getRuns: (id: string) => request<RunRow[]>(`/api/searches/${id}/runs`),
@@ -80,6 +84,13 @@ export const api = {
     request<{ ok: true }>(`/api/listings/${advertId}/star`, {
       method: 'POST',
       body: JSON.stringify({ starred }),
+    }),
+
+  /** Rule a car out, hiding it from every search that finds it. */
+  setDiscarded: (advertId: string, discarded: boolean) =>
+    request<{ ok: true }>(`/api/listings/${advertId}/discard`, {
+      method: 'POST',
+      body: JSON.stringify({ discarded }),
     }),
 
   setVrm: (advertId: string, vrm: string | null) =>

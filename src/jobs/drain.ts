@@ -11,7 +11,7 @@ import { extractAdvert } from '../autotrader/detail';
 import { normaliseAdvert } from '../autotrader/normalise';
 import { detailMatchesCombo } from '../autotrader/match';
 import * as db from '../db/queries';
-import type { ListingDetail, SavedSearch } from '../types';
+import { effectiveCombo, type ListingDetail, type SavedSearch } from '../types';
 
 export const BATCH_SIZE = 35;
 
@@ -41,9 +41,11 @@ async function pruneMismatchedLinks(
     if (!searchCache.has(link.search_id)) {
       searchCache.set(link.search_id, await db.getSearch(database, link.search_id));
     }
-    const combo = searchCache.get(link.search_id)?.combos.find((c) => c.id === link.combo_id);
-    if (!combo) continue;
+    const search = searchCache.get(link.search_id);
+    const rawCombo = search?.combos.find((c) => c.id === link.combo_id);
+    if (!rawCombo || !search) continue;
 
+    const combo = effectiveCombo(rawCombo, search.globalFilters);
     const match = detailMatchesCombo(detail, combo);
     if (!match.matches) {
       await db.unlinkListingFromCombo(database, link.search_id, advertId, link.combo_id);

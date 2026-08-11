@@ -93,6 +93,40 @@ function firstNumber(...values: unknown[]): number | null {
   return null;
 }
 
+/** Words that flip the meaning when they appear just before "import". */
+const NEGATIONS = /\b(not|never|non|no|isn'?t|wasn'?t)\b/i;
+/** Nouns that make "import" describe a component rather than the car. */
+const NOT_THE_CAR = /^\s*(parts?|spec\b|specification|components?|panels?|wheels?|alloys?)/i;
+
+/**
+ * Whether the advert's own words claim the car is an import.
+ *
+ * Only consulted when AutoTrader publishes no vehicle check. Deliberately
+ * strict: a wrong badge here costs a wasted trip across the country, so
+ * "imported parts", "import spec alloys" and "not imported" must all be
+ * rejected. Anything looser is worse than showing nothing.
+ */
+export function mentionsImport(advert: RawAdvert): boolean {
+  const text = [
+    ...(advert.description?.text ?? []),
+    advert.overviewV2?.attentionGrabber ?? '',
+    advert.heading?.subTitle ?? '',
+  ]
+    .filter((part: unknown): part is string => typeof part === 'string')
+    .join(' ');
+
+  for (const match of text.matchAll(/\bimport(ed|s)?\b/gi)) {
+    const index = match.index ?? 0;
+    // A negation within roughly two words before it.
+    const before = text.slice(Math.max(0, index - 24), index);
+    if (NEGATIONS.test(before)) continue;
+    if (NOT_THE_CAR.test(text.slice(index + match[0].length))) continue;
+    return true;
+  }
+
+  return false;
+}
+
 function firstString(...values: unknown[]): string | null {
   for (const value of values) {
     if (typeof value === 'string' && value.trim() !== '') return value.trim();
@@ -162,5 +196,6 @@ export function normaliseAdvert(advert: RawAdvert): ListingDetail {
     location: sellerLocation(advert),
     imageUrl: advert.pageMetaData?.mainImageUrl ?? null,
     vrm: extractVrm(advert),
+    importMentioned: mentionsImport(advert),
   };
 }
