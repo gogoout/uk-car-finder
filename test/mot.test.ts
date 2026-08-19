@@ -54,6 +54,9 @@ describe('odometerMiles', () => {
   it('ignores a test with no usable reading', () => {
     expect(odometerMiles(test({ odometerValue: undefined }))).toBeNull();
     expect(odometerMiles(test({ odometerValue: 'unknown' }))).toBeNull();
+    // DVSA sends explicit nulls, not absent fields, when a reading was
+    // UNREADABLE — as on the COVID-extension records of 2020.
+    expect(odometerMiles(test({ odometerValue: null, odometerUnit: null }))).toBeNull();
   });
 });
 
@@ -130,6 +133,17 @@ describe('summariseMot', () => {
       testCount: 3,
       possibleClocking: false,
     });
+  });
+
+  it('skips a test whose expiry is explicitly null', () => {
+    const summary = summariseMot(
+      raw([
+        test({ completedDate: '2023-05-31T00:00:00.000Z', testResult: 'FAILED', expiryDate: null }),
+        test({ completedDate: '2023-06-01T00:00:00.000Z', expiryDate: '2024-06-11' }),
+      ]),
+    );
+
+    expect(summary.expiryDate).toBe('2024-06-11');
   });
 
   it('takes the expiry from the most recent pass, not a later failure', () => {

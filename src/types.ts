@@ -239,11 +239,13 @@ export interface MotDefect {
 export interface MotTest {
   completedDate: string;
   testResult: string;
-  expiryDate?: string;
-  odometerValue?: string;
+  /** Null on a failure, and on the COVID-extension records. */
+  expiryDate?: string | null;
+  /** Null when `odometerResultType` is UNREADABLE or NO_ODOMETER_READING. */
+  odometerValue?: string | null;
   /** "MI" or "KM" today; older records use lowercase. */
-  odometerUnit?: string;
-  odometerResultType?: string;
+  odometerUnit?: string | null;
+  odometerResultType?: string | null;
   motTestNumber?: string;
   defects?: MotDefect[];
 }
