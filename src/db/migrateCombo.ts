@@ -25,6 +25,8 @@ interface LegacyCombo {
   transmission?: string;
   excludeWriteOffs?: boolean;
   filters?: FilterSelections;
+  labelIsCustom?: boolean;
+  enabled?: boolean;
 }
 
 const LEGACY_TO_FILTER: [keyof LegacyCombo, string][] = [
@@ -43,11 +45,16 @@ const LEGACY_TO_FILTER: [keyof LegacyCombo, string][] = [
 export function migrateCombo(raw: unknown): Combo {
   const legacy = (raw ?? {}) as LegacyCombo;
 
-  // Already migrated — leave it alone.
+  // Already migrated — leave it alone. Optional fields are carried through
+  // explicitly rather than spread, so a legacy key can never ride along; and
+  // they must be carried, because this runs on every read. Dropping one here
+  // silently undoes it on reload however faithfully it was saved.
   if (legacy.filters && typeof legacy.filters === 'object') {
     return {
       id: legacy.id ?? '',
       label: legacy.label ?? '',
+      ...(legacy.labelIsCustom === undefined ? {} : { labelIsCustom: legacy.labelIsCustom }),
+      ...(legacy.enabled === undefined ? {} : { enabled: legacy.enabled }),
       filters: legacy.filters,
     };
   }

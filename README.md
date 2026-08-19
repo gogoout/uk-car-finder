@@ -21,6 +21,10 @@ up on their own, with no code change here.
 Each saved combination stores its selections keyed by AutoTrader's own filter
 names, so `src/autotrader/filters.ts` is close to a pass-through.
 
+A combination can be switched off from its panel header. It then stops being
+searched for and its cars drop out of the results, but the filters and the links
+are kept — switching it back on restores everything without a refresh.
+
 ## What it shows
 
 Per listing: engine size, year, transmission, mileage, fuel, service history

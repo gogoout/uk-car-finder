@@ -362,6 +362,67 @@ describe('starring', () => {
   });
 });
 
+describe('reasons', () => {
+  const seedOne = async () => {
+    await db.upsertSearchListing(DB, searchListing());
+    await db.upsertSearch(DB, savedSearch());
+    const runId = await db.startRun(DB, 's1');
+    await db.linkListingToCombo(DB, 's1', '1', combo(), runId);
+    await db.finishRun(DB, runId, { pagesFetched: 1, listingsSeen: 1, newCount: 1, priceDropCount: 0 });
+  };
+  const first = async (opts = {}) => (await db.getResults(DB, 's1', opts))[0]!;
+
+  it('keeps why a car was shortlisted, and why one was ruled out', async () => {
+    await seedOne();
+
+    await db.setStarred(DB, '1', true, 'closest one with FSH');
+    await db.setDiscarded(DB, '1', true, 'sills look rusty in photo 12');
+
+    const listing = await first({ includeDiscarded: true });
+    expect(listing.starNote).toBe('closest one with FSH');
+    expect(listing.discardReason).toBe('sills look rusty in photo 12');
+  });
+
+  it('leaves the reason alone when the decision is repeated without one', async () => {
+    await seedOne();
+    await db.setStarred(DB, '1', true, 'closest one with FSH');
+
+    // Starring again with no note must not wipe what you wrote — this is the
+    // difference between "no opinion" and "clear it".
+    await db.setStarred(DB, '1', true);
+
+    expect((await first()).starNote).toBe('closest one with FSH');
+  });
+
+  it('clears the reason when one is explicitly emptied', async () => {
+    await seedOne();
+    await db.setStarred(DB, '1', true, 'wrong, actually');
+
+    await db.setStarred(DB, '1', true, null);
+
+    expect((await first()).starNote).toBeNull();
+  });
+
+  it('forgets the reason once the decision is undone', async () => {
+    await seedOne();
+    await db.setDiscarded(DB, '1', true, 'rusty sills');
+
+    await db.setDiscarded(DB, '1', false);
+    await db.setDiscarded(DB, '1', true);
+
+    // The reason belonged to a decision that was reversed; carrying it into a
+    // fresh one would be putting words in your mouth.
+    expect((await first({ includeDiscarded: true })).discardReason).toBeNull();
+  });
+
+  it('has no reason until one is written', async () => {
+    await seedOne();
+    await db.setStarred(DB, '1', true);
+
+    expect((await first()).starNote).toBeNull();
+  });
+});
+
 describe('global filters and discarding', () => {
   const seed = async (listings: Parameters<typeof searchListing>[0][]) => {
     const runId = await db.startRun(DB, 's1');

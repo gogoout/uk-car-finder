@@ -312,11 +312,13 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
 .modal-heading strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .modal-body {
+  /* Takes the space the header and footer don't; min-height:0 is what lets it
+     scroll inside the flex column instead of pushing the footer off-screen. */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 16px;
-  /* Clears the iOS home indicator. */
-  padding-bottom: calc(32px + env(safe-area-inset-bottom));
 }
 .modal-body > * + * { margin-top: 16px; }
 .modal-loading { padding: 40px 0; text-align: center; }
@@ -559,3 +561,43 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
 }
 .mot-defects { margin: 6px 0 0; padding-left: 16px; display: grid; gap: 4px; }
 .mot-defects li { line-height: 1.5; }
+
+/* A parked combination: still here, still editable, just not running. */
+.combo-card.is-off { opacity: 0.6; border-style: dashed; }
+.combo-card.is-off .combo-name { text-decoration: line-through; }
+.combo-off-badge { flex: none; }
+
+/* Modal footer: the decisions about the car, within thumb reach. Close stays
+   in the header, deliberately away from them. */
+.modal-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.modal-foot-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.modal-foot-notes { display: grid; gap: 4px; }
+.modal-foot-spacer { flex: 1; }
+.modal-foot .btn { gap: 6px; }
+.modal-foot .btn.is-on { border-color: var(--accent); color: var(--accent); }
+
+/* Why you shortlisted or rejected a car: shown as a line, edited in place. */
+.note-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 0;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  text-align: left;
+  color: var(--text);
+}
+.note-icon { display: flex; flex: none; color: var(--muted); }
+.note-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-pencil { flex: none; color: var(--muted); opacity: 0; }
+.note-line:hover .note-pencil, .note-line:focus-visible .note-pencil { opacity: 1; }
+.note-input { width: 100%; font-size: 13px; min-height: 34px; }

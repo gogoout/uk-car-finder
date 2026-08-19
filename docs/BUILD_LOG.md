@@ -74,6 +74,85 @@ the MOT call instead — which fails as a *passing* 200 with an empty history.
 
 ---
 
+## 2026-08-19 — Park a combination instead of deleting it
+
+Stopping one combination for a while meant deleting it and rebuilding its
+filters later. Combinations now carry `enabled`, toggled from the header of
+their panel in the editor.
+
+Off means two things at once: not searched for (skipped in `refresh.ts` before
+any request is built) and not shown (left out of the map `getResults` verifies
+credits against). The `search_listings` rows are untouched, so switching one
+back on returns its cars immediately rather than after a refresh — verified live
+at 78 cars → 2 → 78, with the parked combination costing one page of AutoTrader
+requests instead of six.
+
+Absent means on, so every search saved before today stays exactly as it was. A
+parked combination is also exempt from the "needs a make" rule, on both the
+server and the editor's save button: it never runs, so it is allowed to sit
+half-built.
+
+### Modal footer, and a cross that meant two things
+
+The star and discard buttons only existed on the card, so deciding about a car
+meant closing the sheet you were deciding from. They now sit in a footer at the
+bottom of the modal, within thumb reach. Close stays top-right: shutting the
+sheet is not a decision about the car and should not sit beside one that is.
+
+Discarding closes the sheet — ruling a car out is the end of looking at it —
+while restoring one leaves it open.
+
+The discard icon was a cross, the same glyph as close, one meaning "put this
+away for good" and the other "put this away for now". It is a bin now, on the
+card as well.
+
+The link out to AutoTrader moved into the footer too, built from the advert id
+rather than the parsed page, so it still works on the days their page won't
+parse — which is exactly when you want it.
+
+### Reasons, asked at the moment you know them
+
+A shortlisted car and a rejected one both raise the same question a fortnight
+later: why? Star and discard now each take a one-line reason, shown on the card
+and in the modal footer, edited in place by clicking it.
+
+Nothing blocks: the decision is saved before the box appears, and typing nothing
+is a normal outcome. The box opens focused on the click that made the decision,
+because that is the only moment the answer is in your head.
+
+`starred.notes` had been in the schema since the initial migration and never
+used; `discarded` needed a column. Both live with the decision rather than on
+`listings`, so undoing a decision takes its reason with it — carrying an old
+reason into a fresh decision would be putting words in your mouth.
+
+Absent and blank are kept apart all the way down: omitting the note leaves the
+stored one alone, sending an empty one clears it. Without that, the star button
+would wipe the reason every time it was toggled. The first attempt got this
+wrong — `COALESCE(?, notes)` collapses "no opinion" and "clear it" into the same
+bound null — so the two cases are now separate statements.
+
+Discarding from the modal no longer closes it, which reverses what it did an
+hour earlier: the reason box appears in the footer, and closing first would
+leave nowhere to type. The modal also holds its own star and discard state once
+open, because discarding removes the car from the list behind it and the props
+would otherwise snap back to "not discarded" while you were still looking at it.
+
+### The bug this uncovered
+
+`migrateCombo` rebuilt an already-migrated combo as `{id, label, filters}` and
+dropped everything else — so `labelIsCustom` was written correctly by
+`parseCombos`, stored correctly in `combos_json`, and **thrown away on every
+read**. A label you had typed yourself silently became a derived one on reload,
+after which changing any filter overwrote your wording.
+
+`enabled` would have failed the same way, and worse: the toggle would have
+looked like it worked until the page was reloaded, then switched itself back on.
+Optional fields are now carried through explicitly — named rather than spread,
+so a legacy key can't ride along — with a test pinning both flags through a
+save-and-reload round trip.
+
+---
+
 ## 2026-08-11 — Import badges, and storing inputs rather than outputs
 
 Two adverts looked wrong and neither actually was:

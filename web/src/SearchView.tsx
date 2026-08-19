@@ -6,6 +6,7 @@ import { CopyButton } from './CopyButton';
 import { FilterMenu } from './FilterMenu';
 import { Link2, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { relativeTime, sortResults, type SortKey } from './format';
+import { comboEnabled } from '../../src/types';
 
 const SORTS: { key: SortKey; label: string }[] = [
   { key: 'newest', label: 'Newest first' },
@@ -69,13 +70,13 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
     }
   };
 
-  const toggleStar = async (advertId: string, starred: boolean) => {
-    await api.setStarred(advertId, starred);
+  const toggleStar = async (advertId: string, starred: boolean, note?: string | null) => {
+    await api.setStarred(advertId, starred, note);
     await load();
   };
 
-  const discard = async (advertId: string, discarded: boolean) => {
-    await api.setDiscarded(advertId, discarded);
+  const discard = async (advertId: string, discarded: boolean, reason?: string | null) => {
+    await api.setDiscarded(advertId, discarded, reason);
     await load();
   };
 
@@ -239,7 +240,11 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
 
       {visible.length === 0 ? (
         <div className="empty">
-          Nothing matches yet. Try Refresh now, or widen the filters.
+          {/* "Widen the filters" is unhelpful advice when the real reason is
+              that every combination is switched off. */}
+          {data.search.combos.every((c) => !comboEnabled(c))
+            ? 'Every combination is switched off. Turn one back on in Edit filters.'
+            : 'Nothing matches yet. Try Refresh now, or widen the filters.'}
         </div>
       ) : (
         <div className="results">
@@ -260,6 +265,12 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
           advertId={openAdvertId}
           vrm={openListing?.vrm ?? null}
           onVrmSaved={() => void load()}
+          starred={openListing?.starred ?? false}
+          discarded={openListing?.discarded ?? false}
+          starNote={openListing?.starNote ?? null}
+          discardReason={openListing?.discardReason ?? null}
+          onToggleStar={toggleStar}
+          onDiscard={discard}
           onClose={() => setOpenAdvertId(null)}
         />
       )}

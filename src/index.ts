@@ -90,8 +90,11 @@ function parseCombos(input: unknown): Combo[] {
   return input.map((raw, index): Combo => {
     const combo = (raw ?? {}) as Partial<Combo>;
     const filters = parseFilters(combo.filters, index);
+    const enabled = combo.enabled !== false;
 
-    if (!filters[FILTER.make]?.length) {
+    // A combination with no make would match the entire site — but a parked one
+    // never runs, so it is allowed to sit there half-built.
+    if (enabled && !filters[FILTER.make]?.length) {
       throw new BadRequest(`Combination ${index + 1} needs a make`);
     }
 
@@ -103,9 +106,21 @@ function parseCombos(input: unknown): Combo[] {
       id: combo.id || shortId(6),
       label: combo.label?.trim() || derivedLabel || 'Untitled combination',
       labelIsCustom: Boolean(combo.labelIsCustom),
+      enabled,
       filters,
     };
   });
+}
+
+/**
+ * Absent means "leave the stored note alone"; blank means "clear it". Keeping
+ * those apart is what lets the star be toggled without losing what you wrote.
+ */
+function cleanNote(value: string | null | undefined): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const trimmed = String(value).trim().slice(0, 500);
+  return trimmed || null;
 }
 
 function parseSearchBody(body: any, id: string): Omit<SavedSearch, 'createdAt' | 'updatedAt' | 'lastRunAt'> {
@@ -295,15 +310,18 @@ app.get('/api/listings/:advertId/detail', async (c) => {
 
 /** Rule a car out, hiding it from every search that finds it. */
 app.post('/api/listings/:advertId/discard', async (c) => {
-  const { discarded } = (await c.req.json()) as { discarded?: boolean };
-  await db.setDiscarded(c.env.DB, c.req.param('advertId'), discarded !== false);
+  const { discarded, reason } = (await c.req.json()) as {
+    discarded?: boolean;
+    reason?: string | null;
+  };
+  await db.setDiscarded(c.env.DB, c.req.param('advertId'), discarded !== false, cleanNote(reason));
   return c.json({ ok: true });
 });
 
 app.post('/api/listings/:advertId/star', async (c) => {
   const advertId = c.req.param('advertId');
-  const { starred } = (await c.req.json()) as { starred?: boolean };
-  await db.setStarred(c.env.DB, advertId, starred !== false);
+  const { starred, note } = (await c.req.json()) as { starred?: boolean; note?: string | null };
+  await db.setStarred(c.env.DB, advertId, starred !== false, cleanNote(note));
   return c.json({ ok: true });
 });
 

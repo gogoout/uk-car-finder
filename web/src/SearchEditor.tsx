@@ -3,6 +3,7 @@ import { api, rememberSearchId, type Combo, type SavedSearch } from './api';
 import { ComboEditor } from './ComboEditor';
 import { GlobalFilters } from './GlobalFilters';
 import type { FilterSelections } from './api';
+import { comboEnabled } from '../../src/types';
 
 const newCombo = (): Combo => ({
   id: Math.random().toString(36).slice(2, 8),
@@ -30,12 +31,13 @@ export function SearchEditor({
   const [error, setError] = useState<string | null>(null);
 
   // AutoTrader rejects a search with no postcode ("a required filter"), and a
-  // combination with no make would match the entire site.
+  // combination with no make would match the entire site. A parked combination
+  // is exempt, matching the server: it never runs, so it can sit half-built.
   const blockers = [
     ...(postcode.trim() ? [] : ['enter a postcode']),
     ...combos
       .map((combo, index) =>
-        combo.filters.make?.length
+        !comboEnabled(combo) || combo.filters.make?.length
           ? null
           : `choose a make for ${combo.label || `combination ${index + 1}`}`,
       )

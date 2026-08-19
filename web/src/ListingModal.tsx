@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import { Gallery } from './Gallery';
 import { CopyButton } from './CopyButton';
+import { NoteField } from './NoteField';
 import { MotPanel } from './MotPanel';
 import { PRICE_LABELS, priceTone, SERVICE_LABELS, serviceTone } from './format';
 import type { FullDetail } from '../../src/autotrader/fullDetail';
-import { ChevronDown, ChevronRight, ExternalLink, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, Star, Trash2, Undo2, X } from 'lucide-react';
 
 /** Collapsible section, matching the accordion used by the filter editor. */
 function Section({
@@ -46,14 +47,35 @@ export function ListingModal({
   advertId,
   vrm,
   onVrmSaved,
+  starred,
+  discarded,
+  starNote,
+  discardReason,
+  onToggleStar,
+  onDiscard,
   onClose,
 }: {
   advertId: string;
   /** Plate on file for this car, if you have entered one. */
   vrm: string | null;
   onVrmSaved: (vrm: string) => void;
+  starred: boolean;
+  discarded: boolean;
+  /** Your own words, from when you made the decision. */
+  starNote: string | null;
+  discardReason: string | null;
+  onToggleStar: (advertId: string, starred: boolean, note?: string | null) => void;
+  onDiscard: (advertId: string, discarded: boolean, reason?: string | null) => void;
   onClose: () => void;
 }) {
+  // Held locally once the sheet is open, because discarding a car removes it
+  // from the list behind — the props would snap back to "not discarded" while
+  // you are still looking at it.
+  const [isStarred, setIsStarred] = useState(starred);
+  const [isDiscarded, setIsDiscarded] = useState(discarded);
+  const [note, setNote] = useState(starNote);
+  const [reason, setReason] = useState(discardReason);
+  const [asking, setAsking] = useState<'star' | 'discard' | null>(null);
   const [detail, setDetail] = useState<FullDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -116,16 +138,7 @@ export function ListingModal({
         </header>
 
         <div className="modal-body">
-          {error && (
-            <div className="banner">
-              {error}
-              <div className="tiny" style={{ marginTop: 6 }}>
-                <a href={`https://www.autotrader.co.uk/car-details/${advertId}`} target="_blank" rel="noreferrer">
-                  Open on AutoTrader
-                </a>
-              </div>
-            </div>
-          )}
+          {error && <div className="banner">{error}</div>}
 
           {error && motSection}
 
@@ -260,17 +273,106 @@ export function ListingModal({
               )}
 
               {motSection}
-
-              <div className="row">
-                <a className="btn" href={detail.detailUrl} target="_blank" rel="noreferrer">
-                  View on AutoTrader
-                  <ExternalLink size={16} aria-hidden="true" />
-                </a>
-                <CopyButton value={detail.detailUrl} label="Copy link" copiedLabel="Copied ✓" />
-              </div>
             </>
           )}
         </div>
+
+        {/* The two decisions you make while looking at the photos, kept within
+            thumb reach at the bottom rather than at the end of a long scroll.
+            Close stays top-right: shutting the sheet is not a decision about
+            the car, and it must not sit next to one that is. */}
+        <footer className="modal-foot">
+          {/* Asked at the moment of the decision, because that is the only
+              moment you know the answer. Never required: the decision is
+              already saved by the time the box appears. */}
+          {(isStarred || isDiscarded) && (
+            <div className="modal-foot-notes">
+              {isStarred && (
+                <NoteField
+                  value={note}
+                  icon={<Star size={11} fill="currentColor" />}
+                  placeholder="Why shortlisted?"
+                  startEditing={asking === 'star'}
+                  onSave={(next) => {
+                    setNote(next);
+                    onToggleStar(advertId, true, next);
+                  }}
+                />
+              )}
+              {isDiscarded && (
+                <NoteField
+                  value={reason}
+                  icon={<Trash2 size={11} />}
+                  placeholder="Why ruled out?"
+                  startEditing={asking === 'discard'}
+                  onSave={(next) => {
+                    setReason(next);
+                    onDiscard(advertId, true, next);
+                  }}
+                />
+              )}
+            </div>
+          )}
+
+          <div className="modal-foot-actions">
+          <button
+            type="button"
+            className={`btn${isStarred ? ' is-on' : ''}`}
+            aria-pressed={isStarred}
+            onClick={() => {
+              setIsStarred(!isStarred);
+              setAsking(isStarred ? null : 'star');
+              onToggleStar(advertId, !isStarred);
+            }}
+          >
+            <Star size={16} aria-hidden="true" fill={isStarred ? 'currentColor' : 'none'} />
+            {isStarred ? 'Shortlisted' : 'Shortlist'}
+          </button>
+
+          <button
+            type="button"
+            className="btn danger"
+            onClick={() => {
+              setIsDiscarded(!isDiscarded);
+              // The sheet stays open on a discard now: the reason box appears
+              // right here, and closing first would leave nowhere to type it.
+              setAsking(isDiscarded ? null : 'discard');
+              onDiscard(advertId, !isDiscarded);
+            }}
+          >
+            {isDiscarded ? (
+              <>
+                <Undo2 size={16} aria-hidden="true" />
+                Restore
+              </>
+            ) : (
+              <>
+                <Trash2 size={16} aria-hidden="true" />
+                Discard
+              </>
+            )}
+          </button>
+
+          <span className="modal-foot-spacer" />
+
+          {/* Built from the id rather than the loaded advert, so the way out to
+              AutoTrader still works on the days their page won't parse. */}
+          <a
+            className="btn"
+            href={detail?.detailUrl ?? `https://www.autotrader.co.uk/car-details/${advertId}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            AutoTrader
+            <ExternalLink size={16} aria-hidden="true" />
+          </a>
+          <CopyButton
+            value={detail?.detailUrl ?? `https://www.autotrader.co.uk/car-details/${advertId}`}
+            label="Copy link"
+            copiedLabel="Copied ✓"
+          />
+          </div>
+        </footer>
       </div>
     </div>
   );

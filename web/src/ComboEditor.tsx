@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { api, type Combo, type FilterSelections } from './api';
 import { FacetAccordion } from './FacetAccordion';
 import { applyCascade } from '../../src/facetUi';
-import { FILTER } from '../../src/types';
+import { comboEnabled, FILTER } from '../../src/types';
 import type { FacetData } from '../../src/autotrader/facets';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, ToggleLeft, ToggleRight } from 'lucide-react';
 
 /**
  * One search combination, e.g. "MINI Cooper 1.5 Auto, 2015-16, under 85k,
@@ -45,8 +45,9 @@ export function ComboEditor({
 
   useEffect(() => {
     // No point fetching a collapsed panel's options — with several combos that
-    // is several wasted round trips on load.
-    if (!open) return;
+    // is several wasted round trips on load. Same for a parked one, whose
+    // result count would describe a search that isn't running.
+    if (!open || !comboEnabled(combo)) return;
 
     const id = ++requestId.current;
     setLoading(true);
@@ -66,9 +67,10 @@ export function ComboEditor({
       .finally(() => {
         if (id === requestId.current) setLoading(false);
       });
-  }, [combo.filters, globalFilters, postcode, radius, open]);
+  }, [combo.filters, combo.enabled, globalFilters, postcode, radius, open]);
 
   const activeFilterCount = Object.keys(combo.filters).length;
+  const enabled = comboEnabled(combo);
 
   const setFilter = (filter: string, values: string[]) => {
     const next = { ...combo.filters };
@@ -86,7 +88,7 @@ export function ComboEditor({
   };
 
   return (
-    <div className={`card combo-card${open ? ' is-open' : ''}`}>
+    <div className={`card combo-card${open ? ' is-open' : ''}${enabled ? '' : ' is-off'}`}>
       <div className="combo-head">
         <button
           type="button"
@@ -98,6 +100,7 @@ export function ComboEditor({
             {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </span>
           <span className="combo-name">{combo.label || 'New combination'}</span>
+          {!enabled && <span className="badge combo-off-badge">Off</span>}
           {!open && activeFilterCount > 0 && (
             <span className="tiny muted combo-count">
               {activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'}
@@ -106,9 +109,26 @@ export function ComboEditor({
         </button>
 
         <span className="row combo-actions">
-          {open && facets?.resultCount !== null && facets?.resultCount !== undefined && (
+          {open && enabled && facets?.resultCount !== null && facets?.resultCount !== undefined && (
             <span className="badge">{facets.resultCount.toLocaleString('en-GB')} on AutoTrader</span>
           )}
+          {/* Park a combination rather than deleting it: off means it is not
+              searched for and its cars are hidden, but the filters — and the
+              cars it already found — are kept for when it goes back on. */}
+          <button
+            type="button"
+            className="icon"
+            aria-pressed={enabled}
+            aria-label={enabled ? 'Switch this combination off' : 'Switch this combination on'}
+            title={enabled ? 'Switch off — stop searching and hide its cars' : 'Switch on'}
+            onClick={() => onChange({ ...combo, enabled: !enabled })}
+          >
+            {enabled ? (
+              <ToggleRight size={20} aria-hidden="true" />
+            ) : (
+              <ToggleLeft size={20} aria-hidden="true" />
+            )}
+          </button>
           {canRemove && (
             <button type="button" className="link" onClick={onRemove}>
               Remove
