@@ -11,7 +11,7 @@ import { extractAdvert } from '../autotrader/detail';
 import { normaliseAdvert } from '../autotrader/normalise';
 import { detailMatchesCombo } from '../autotrader/match';
 import * as db from '../db/queries';
-import { effectiveCombo, type ListingDetail, type SavedSearch } from '../types';
+import { comboEnabled, effectiveCombo, type ListingDetail, type SavedSearch } from '../types';
 
 export const BATCH_SIZE = 35;
 
@@ -43,7 +43,9 @@ async function pruneMismatchedLinks(
     }
     const search = searchCache.get(link.search_id);
     const rawCombo = search?.combos.find((c) => c.id === link.combo_id);
-    if (!rawCombo || !search) continue;
+    // A parked combination is inert: it should not be quietly dropping its own
+    // links in the background, so that switching it back on returns what it had.
+    if (!rawCombo || !search || !comboEnabled(rawCombo)) continue;
 
     const combo = effectiveCombo(rawCombo, search.globalFilters);
     const match = detailMatchesCombo(detail, combo);

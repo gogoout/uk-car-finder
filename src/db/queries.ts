@@ -4,6 +4,7 @@
  */
 
 import {
+  comboEnabled,
   effectiveCombo,
   type Combo,
   type ListingDetail,
@@ -600,9 +601,14 @@ export async function getResults(
   // Globals must be layered on here too: without it, tightening a global would
   // not retro-filter listings already stored — the same gap that once left
   // over-priced cars on screen after narrowing a combination.
+  // Parked combinations are left out entirely, so their credits are dropped by
+  // the same path as a deleted combination's. The `search_listings` rows stay,
+  // which is what makes switching one back on instant rather than a refresh.
   const search = await getSearch(db, searchId);
   const combosById = new Map(
-    (search?.combos ?? []).map((c) => [c.id, effectiveCombo(c, search?.globalFilters)]),
+    (search?.combos ?? [])
+      .filter(comboEnabled)
+      .map((c) => [c.id, effectiveCombo(c, search?.globalFilters)]),
   );
 
   const verified: ResultListing[] = [];

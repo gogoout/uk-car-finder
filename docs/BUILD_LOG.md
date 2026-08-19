@@ -74,6 +74,40 @@ the MOT call instead — which fails as a *passing* 200 with an empty history.
 
 ---
 
+## 2026-08-19 — Park a combination instead of deleting it
+
+Stopping one combination for a while meant deleting it and rebuilding its
+filters later. Combinations now carry `enabled`, toggled from the header of
+their panel in the editor.
+
+Off means two things at once: not searched for (skipped in `refresh.ts` before
+any request is built) and not shown (left out of the map `getResults` verifies
+credits against). The `search_listings` rows are untouched, so switching one
+back on returns its cars immediately rather than after a refresh — verified live
+at 78 cars → 2 → 78, with the parked combination costing one page of AutoTrader
+requests instead of six.
+
+Absent means on, so every search saved before today stays exactly as it was. A
+parked combination is also exempt from the "needs a make" rule, on both the
+server and the editor's save button: it never runs, so it is allowed to sit
+half-built.
+
+### The bug this uncovered
+
+`migrateCombo` rebuilt an already-migrated combo as `{id, label, filters}` and
+dropped everything else — so `labelIsCustom` was written correctly by
+`parseCombos`, stored correctly in `combos_json`, and **thrown away on every
+read**. A label you had typed yourself silently became a derived one on reload,
+after which changing any filter overwrote your wording.
+
+`enabled` would have failed the same way, and worse: the toggle would have
+looked like it worked until the page was reloaded, then switched itself back on.
+Optional fields are now carried through explicitly — named rather than spread,
+so a legacy key can't ride along — with a test pinning both flags through a
+save-and-reload round trip.
+
+---
+
 ## 2026-08-11 — Import badges, and storing inputs rather than outputs
 
 Two adverts looked wrong and neither actually was:

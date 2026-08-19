@@ -201,6 +201,30 @@ describe('migrateCombo', () => {
     expect(migrateCombo(migrateCombo(modern))).toEqual(modern);
   });
 
+  it('keeps the optional flags, which this used to drop on every read', () => {
+    // These are written and stored correctly; it was reading them back that
+    // lost them. A custom label silently became derived again on reload, and
+    // a switched-off combination would have switched itself back on.
+    const modern = {
+      id: 'a',
+      label: 'My wording',
+      labelIsCustom: true,
+      enabled: false,
+      filters: { make: ['MINI'] },
+    };
+
+    expect(migrateCombo(modern)).toEqual(modern);
+  });
+
+  it('leaves the flags absent when they were never set', () => {
+    // Absent means on, so writing `enabled: true` into every old row would be
+    // noise — and `toEqual` here would not catch it.
+    const migrated = migrateCombo({ id: 'a', label: 'Plain', filters: { make: ['MINI'] } });
+
+    expect('enabled' in migrated).toBe(false);
+    expect('labelIsCustom' in migrated).toBe(false);
+  });
+
   it('handles junk without throwing', () => {
     expect(migrateCombo(null).filters).toEqual({});
     expect(migrateCombos(null)).toEqual([]);

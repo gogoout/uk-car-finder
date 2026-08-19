@@ -6,6 +6,7 @@ import { CopyButton } from './CopyButton';
 import { FilterMenu } from './FilterMenu';
 import { Link2, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { relativeTime, sortResults, type SortKey } from './format';
+import { comboEnabled } from '../../src/types';
 
 const SORTS: { key: SortKey; label: string }[] = [
   { key: 'newest', label: 'Newest first' },
@@ -239,7 +240,11 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
 
       {visible.length === 0 ? (
         <div className="empty">
-          Nothing matches yet. Try Refresh now, or widen the filters.
+          {/* "Widen the filters" is unhelpful advice when the real reason is
+              that every combination is switched off. */}
+          {data.search.combos.every((c) => !comboEnabled(c))
+            ? 'Every combination is switched off. Turn one back on in Edit filters.'
+            : 'Nothing matches yet. Try Refresh now, or widen the filters.'}
         </div>
       ) : (
         <div className="results">

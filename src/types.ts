@@ -29,8 +29,16 @@ export interface Combo {
    * regenerating it from make/model/variant and overwriting your wording.
    */
   labelIsCustom?: boolean;
+  /**
+   * Off means the combination is parked: not searched for, and its cars hidden.
+   * Absent means on, so every search saved before this existed stays as it was.
+   */
+  enabled?: boolean;
   filters: FilterSelections;
 }
+
+/** Absent is on — only an explicit `false` parks a combination. */
+export const comboEnabled = (combo: Combo): boolean => combo.enabled !== false;
 
 /** Filter names this app reads directly, rather than just passing through. */
 export const FILTER = {

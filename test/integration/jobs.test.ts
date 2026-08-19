@@ -140,6 +140,74 @@ describe('refreshSearch', () => {
   });
 });
 
+describe('a switched-off combination', () => {
+  const off = (id: string, label: string) =>
+    combo({ make: ['MAZDA'], model: ['Mazda2'] }, { id, label, enabled: false });
+
+  it('is never sent to AutoTrader', async () => {
+    const search = savedSearch({ combos: [off('c2', 'Mazda2')] });
+    await db.upsertSearch(DB, search);
+    const fetchImpl = vi.fn().mockResolvedValue(gatewayPage(['1']));
+
+    const result = await refreshSearch(DB, search, { fetchImpl, delayMs: 0 });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(result.pagesFetched).toBe(0);
+    expect(result.listingsSeen).toBe(0);
+  });
+
+  it('does not stop the combinations that are still on', async () => {
+    const search = savedSearch({ combos: [combo(), off('c2', 'Mazda2')] });
+    await db.upsertSearch(DB, search);
+    const fetchImpl = vi.fn().mockResolvedValue(gatewayPage(['1']));
+
+    const result = await refreshSearch(DB, search, { fetchImpl, delayMs: 0 });
+
+    expect(result.listingsSeen).toBe(1);
+    expect((await db.getResults(DB, 's1'))[0]!.matchedCombos).toEqual(['MINI Cooper 1.5 Auto']);
+  });
+
+  it('hides its cars, and gives them back when switched on again', async () => {
+    const search = savedSearch();
+    await db.upsertSearch(DB, search);
+    await refreshSearch(DB, search, {
+      fetchImpl: vi.fn().mockResolvedValue(gatewayPage(['1'])),
+      delayMs: 0,
+    });
+    expect(await db.getResults(DB, 's1')).toHaveLength(1);
+
+    await db.upsertSearch(DB, {
+      ...search,
+      combos: [{ ...combo(), enabled: false }],
+    });
+    expect(await db.getResults(DB, 's1')).toHaveLength(0);
+
+    // Back on with no refresh at all: the links were kept, so the cars return
+    // rather than having to be found again.
+    await db.upsertSearch(DB, { ...search, combos: [{ ...combo(), enabled: true }] });
+    expect(await db.getResults(DB, 's1')).toHaveLength(1);
+  });
+
+  it('keeps a car another combination also claims, crediting only the live one', async () => {
+    const both = combo({}, { id: 'c2', label: 'Any MINI' });
+    const search = savedSearch({ combos: [combo(), both] });
+    await db.upsertSearch(DB, search);
+    await refreshSearch(DB, search, {
+      fetchImpl: vi.fn().mockResolvedValue(gatewayPage(['1'])),
+      delayMs: 0,
+    });
+    expect((await db.getResults(DB, 's1'))[0]!.matchedCombos).toHaveLength(2);
+
+    await db.upsertSearch(DB, {
+      ...search,
+      combos: [{ ...combo(), enabled: false }, both],
+    });
+
+    const [result] = await db.getResults(DB, 's1');
+    expect(result!.matchedCombos).toEqual(['Any MINI']);
+  });
+});
+
 describe('drainDetailQueue', () => {
   it('enriches queued listings from their detail pages', async () => {
     const search = savedSearch();

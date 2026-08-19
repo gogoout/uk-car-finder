@@ -7,7 +7,7 @@ import { buildFilters } from '../autotrader/filters';
 import { matchesCombo } from '../autotrader/match';
 import { searchAll, type SearchAllOptions } from '../autotrader/search';
 import * as db from '../db/queries';
-import { effectiveCombo, type SavedSearch } from '../types';
+import { comboEnabled, effectiveCombo, type SavedSearch } from '../types';
 
 export interface RefreshResult {
   runId: number;
@@ -36,6 +36,10 @@ export async function refreshSearch(
   const failures: string[] = [];
 
   for (const rawCombo of search.combos) {
+    // Parked combinations cost nothing: skipped before any request is built, so
+    // switching one off really does stop AutoTrader being asked about it.
+    if (!comboEnabled(rawCombo)) continue;
+
     // The search's globals layered under the combination's own filters. Used
     // for both the request and the verification below, so what we ask for and
     // what we accept can't drift apart.

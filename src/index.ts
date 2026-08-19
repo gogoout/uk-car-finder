@@ -90,8 +90,11 @@ function parseCombos(input: unknown): Combo[] {
   return input.map((raw, index): Combo => {
     const combo = (raw ?? {}) as Partial<Combo>;
     const filters = parseFilters(combo.filters, index);
+    const enabled = combo.enabled !== false;
 
-    if (!filters[FILTER.make]?.length) {
+    // A combination with no make would match the entire site — but a parked one
+    // never runs, so it is allowed to sit there half-built.
+    if (enabled && !filters[FILTER.make]?.length) {
       throw new BadRequest(`Combination ${index + 1} needs a make`);
     }
 
@@ -103,6 +106,7 @@ function parseCombos(input: unknown): Combo[] {
       id: combo.id || shortId(6),
       label: combo.label?.trim() || derivedLabel || 'Untitled combination',
       labelIsCustom: Boolean(combo.labelIsCustom),
+      enabled,
       filters,
     };
   });
