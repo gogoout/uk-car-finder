@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DetailParseError, extractAdvert } from '../src/autotrader/detail';
+import { AdvertGone, DetailParseError, extractAdvert } from '../src/autotrader/detail';
 import { checkStatus, extractVrm, normaliseAdvert, parseEngineLitres } from '../src/autotrader/normalise';
 import {
   MAZDA_FSH,
@@ -17,6 +17,17 @@ describe('extractAdvert', () => {
 
   it('throws a typed error when the hydration blob is missing', () => {
     expect(() => extractAdvert('<html><body>nope</body></html>')).toThrow(DetailParseError);
+  });
+
+  it('reports a sold advert as gone rather than as a parse failure', () => {
+    // AutoTrader keeps serving the page after a car sells; the hydration blob
+    // is intact and simply carries no advert. Calling that a parse error made
+    // every sold car look like a bug in the parser.
+    const hydration = JSON.stringify({ loaderData: { 'car-details': {} } });
+    const html = `<script>window.__staticRouterHydrationData = JSON.parse(${JSON.stringify(hydration)})</script>`;
+
+    expect(() => extractAdvert(html)).toThrow(AdvertGone);
+    expect(() => extractAdvert(html)).not.toThrow(DetailParseError);
   });
 });
 

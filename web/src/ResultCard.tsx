@@ -27,13 +27,16 @@ export function ResultCard({
 }) {
   const enriched = listing.detailFetchedAt !== null;
   const mot = listing.motSummary;
+  const gone = listing.goneAt !== null;
   // Which reason box to open focused, set by the click that just changed the
   // decision — you know why at that moment and nowhere else.
   const [asking, setAsking] = useState<'star' | 'discard' | null>(null);
 
   return (
     <article
-      className={`card listing${listing.isNew ? ' is-new' : ''}${listing.discarded ? ' is-discarded' : ''}`}
+      className={`card listing${listing.isNew ? ' is-new' : ''}${
+        listing.discarded || gone ? ' is-discarded' : ''
+      }`}
     >
       <div className="listing-head">
         {/* Photo and title both open the full advert — the link out to
@@ -99,13 +102,20 @@ export function ResultCard({
 
       <div className="spread">
         <div>
-          <span className="price">{money(listing.price)}</span>
+          <span className={gone ? 'price price-gone' : 'price'}>{money(listing.price)}</span>
           {listing.priceDrop !== null && (
             <span className="price-was">{money(listing.previousPrice)}</span>
           )}
         </div>
         <div className="badges">
-          {listing.isNew && <span className="badge new">New</span>}
+          {/* AutoTrader still serves a page for a sold car, so this is only
+              ever learned by looking — and it is why the advert wouldn't open. */}
+          {gone && (
+            <span className="badge bad" title={`Not on AutoTrader as of ${relativeTime(listing.goneAt)}`}>
+              Sold or gone
+            </span>
+          )}
+          {listing.isNew && !gone && <span className="badge new">New</span>}
           {listing.priceDrop !== null && (
             <span className="badge good">↓ {money(listing.priceDrop)}</span>
           )}

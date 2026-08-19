@@ -39,6 +39,8 @@ export interface ResultsResponse {
   results: ResultListing[];
   pendingDetails: number;
   discardedCount: number;
+  /** Cars AutoTrader has stopped listing, hidden unless asked for. */
+  goneCount: number;
 }
 
 /**
@@ -110,10 +112,16 @@ export const api = {
 
   deleteSearch: (id: string) => request<{ ok: true }>(`/api/searches/${id}`, { method: 'DELETE' }),
 
-  getResults: (id: string, excludeWriteOffs: boolean, includeDiscarded = false) =>
+  getResults: (
+    id: string,
+    excludeWriteOffs: boolean,
+    includeDiscarded = false,
+    includeGone = false,
+  ) =>
     request<ResultsResponse>(
       `/api/searches/${id}/results?excludeWriteOffs=${excludeWriteOffs ? 'true' : 'false'}` +
-        `&includeDiscarded=${includeDiscarded ? 'true' : 'false'}`,
+        `&includeDiscarded=${includeDiscarded ? 'true' : 'false'}` +
+        `&includeGone=${includeGone ? 'true' : 'false'}`,
     ),
 
   getRuns: (id: string) => request<RunRow[]>(`/api/searches/${id}/runs`),

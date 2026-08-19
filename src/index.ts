@@ -7,7 +7,7 @@ import { buildMotHistory, fetchMotRaw, isMotConfigured, MotNotFound, normalisePl
 import { getMotHistory } from './db/motCache';
 import { fetchFacets } from './autotrader/facets';
 import { fetchDetailPage } from './autotrader/gateway';
-import { extractAdvert } from './autotrader/detail';
+import { AdvertGone, extractAdvert } from './autotrader/detail';
 import { normaliseFullDetail } from './autotrader/fullDetail';
 import { normaliseAdvert } from './autotrader/normalise';
 import { getFacets, pruneFacetCache } from './db/facetCache';
@@ -233,6 +233,7 @@ app.get('/api/searches/:id/results', async (c) => {
   const results = await db.getResults(c.env.DB, id, {
     excludeWriteOffs: c.req.query('excludeWriteOffs') === 'true',
     includeDiscarded: c.req.query('includeDiscarded') === 'true',
+    includeGone: c.req.query('includeGone') === 'true',
   });
 
   return c.json({
@@ -240,6 +241,7 @@ app.get('/api/searches/:id/results', async (c) => {
     results,
     pendingDetails: await db.queueDepth(c.env.DB),
     discardedCount: await db.countDiscarded(c.env.DB, id),
+    goneCount: await db.countGone(c.env.DB, id),
   });
 });
 
@@ -293,9 +295,15 @@ app.get('/api/listings/:advertId/detail', async (c) => {
     return c.json(normaliseFullDetail(advert, advertId));
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Could not load this advert';
-    // A 404 from AutoTrader means the advert is gone, which is worth saying
-    // plainly rather than reporting as a generic failure.
-    const gone = message.includes('404');
+    // Two ways an advert can be gone: a 404, or — far more common — a page that
+    // still renders but carries no advert. Both are ordinary, and both are
+    // worth recording, so the car stops appearing in results at all.
+    const gone = err instanceof AdvertGone || message.includes('404');
+    if (gone) {
+      c.executionCtx.waitUntil(
+        db.markGone(c.env.DB, advertId).catch((e) => console.error('markGone failed', advertId, e)),
+      );
+    }
     return c.json(
       {
         error: gone

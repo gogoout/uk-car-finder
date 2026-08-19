@@ -598,6 +598,12 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
 }
 .note-icon { display: flex; flex: none; color: var(--muted); }
 .note-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.note-pencil { flex: none; color: var(--muted); opacity: 0; }
+/* Always visible, faintly: there is no hover on a phone, and a pencil that
+   only appears on hover makes an editable line look like static text. */
+.note-pencil { flex: none; color: var(--muted); opacity: 0.55; }
 .note-line:hover .note-pencil, .note-line:focus-visible .note-pencil { opacity: 1; }
+.note-line .muted { text-decoration: underline dotted; text-underline-offset: 3px; }
 .note-input { width: 100%; font-size: 13px; min-height: 34px; }
+
+/* A car that has left AutoTrader: kept for its price history, not for buying. */
+.price-gone { text-decoration: line-through; color: var(--muted); }

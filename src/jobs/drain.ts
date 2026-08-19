@@ -7,7 +7,7 @@
  */
 
 import { fetchDetailPage, type FetchOptions } from '../autotrader/gateway';
-import { extractAdvert } from '../autotrader/detail';
+import { AdvertGone, extractAdvert } from '../autotrader/detail';
 import { normaliseAdvert } from '../autotrader/normalise';
 import { detailMatchesCombo } from '../autotrader/match';
 import * as db from '../db/queries';
@@ -19,6 +19,8 @@ export interface DrainResult {
   attempted: number;
   succeeded: number;
   failed: number;
+  /** Adverts confirmed to have gone from AutoTrader. */
+  gone: number;
   remaining: number;
   /** Combo links dropped because the detail page contradicted the combo. */
   unlinked: number;
@@ -76,6 +78,7 @@ export async function drainDetailQueue(
   let succeeded = 0;
   let failed = 0;
   let unlinked = 0;
+  let gone = 0;
   // One search is usually behind a whole batch; don't re-read it per listing.
   const searchCache = new Map<string, SavedSearch | null>();
 
@@ -88,6 +91,15 @@ export async function drainDetailQueue(
       await db.dequeueDetail(database, item.advert_id);
       succeeded++;
     } catch (err) {
+      // A sold or withdrawn advert is a settled answer, not a failure to retry:
+      // record it, take it off the queue, and stop showing the car.
+      if (err instanceof AdvertGone || (err as { status?: number })?.status === 404) {
+        await db.markGone(database, item.advert_id);
+        await db.dequeueDetail(database, item.advert_id);
+        gone++;
+        continue;
+      }
+
       // Leave it queued with a bumped attempt count; takeQueueBatch skips it
       // once it has failed three times, so a dead advert can't block the queue.
       await db.recordQueueFailure(
@@ -105,6 +117,7 @@ export async function drainDetailQueue(
     attempted: batch.length,
     succeeded,
     failed,
+    gone,
     unlinked,
     remaining: await db.queueDepth(database),
   };

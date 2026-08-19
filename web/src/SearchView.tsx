@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { api, rememberSearchId, type ResultsResponse, type RunRow } from './api';
+import { api, rememberSearchId, type ResultListing, type ResultsResponse, type RunRow } from './api';
 import { ResultCard } from './ResultCard';
 import { ListingModal } from './ListingModal';
 import { CopyButton } from './CopyButton';
@@ -29,12 +29,13 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
   const [showRuns, setShowRuns] = useState(false);
   const [openAdvertId, setOpenAdvertId] = useState<string | null>(null);
   const [showDiscarded, setShowDiscarded] = useState(false);
+  const [showGone, setShowGone] = useState(false);
 
   const load = useCallback(async () => {
     try {
       setError(null);
       const [results, runHistory] = await Promise.all([
-        api.getResults(id, excludeWriteOffs, showDiscarded),
+        api.getResults(id, excludeWriteOffs, showDiscarded, showGone),
         api.getRuns(id),
       ]);
       setData(results);
@@ -44,7 +45,7 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load');
     }
-  }, [id, excludeWriteOffs, showDiscarded]);
+  }, [id, excludeWriteOffs, showDiscarded, showGone]);
 
   useEffect(() => {
     void load();
@@ -70,14 +71,47 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
     }
   };
 
+  /**
+   * Applies a decision to the row on screen rather than reloading the list.
+   *
+   * Reloading is what broke this: a discarded car is filtered out of the
+   * results, so the card carrying its reason box disappeared the instant you
+   * pressed the bin — with nowhere left to type. Patching in place keeps it on
+   * screen, dimmed, with Undo and the reason box on it, until the next real
+   * load (a refresh, a filter change, or coming back to the search).
+   */
+  const patch = (advertId: string, changes: Partial<ResultListing>) =>
+    setData((prev) =>
+      prev
+        ? {
+            ...prev,
+            results: prev.results.map((l) => (l.advertId === advertId ? { ...l, ...changes } : l)),
+            discardedCount:
+              changes.discarded === undefined
+                ? prev.discardedCount
+                : prev.discardedCount + (changes.discarded ? 1 : -1),
+          }
+        : prev,
+    );
+
   const toggleStar = async (advertId: string, starred: boolean, note?: string | null) => {
-    await api.setStarred(advertId, starred, note);
-    await load();
+    patch(advertId, { starred, ...(note === undefined ? {} : { starNote: note }) });
+    try {
+      await api.setStarred(advertId, starred, note);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save that');
+      await load();
+    }
   };
 
   const discard = async (advertId: string, discarded: boolean, reason?: string | null) => {
-    await api.setDiscarded(advertId, discarded, reason);
-    await load();
+    patch(advertId, { discarded, ...(reason === undefined ? {} : { discardReason: reason }) });
+    try {
+      await api.setDiscarded(advertId, discarded, reason);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save that');
+      await load();
+    }
   };
 
   const visible = useMemo(() => {
@@ -177,6 +211,16 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
                     label: `Discarded (${data.discardedCount})`,
                     checked: showDiscarded,
                     onChange: setShowDiscarded,
+                  },
+                ]
+              : []),
+            ...(data.goneCount > 0 || showGone
+              ? [
+                  {
+                    key: 'gone',
+                    label: `Sold or gone (${data.goneCount})`,
+                    checked: showGone,
+                    onChange: setShowGone,
                   },
                 ]
               : []),

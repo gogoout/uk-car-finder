@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from '../../src/index';
-import { resetDb, searchListing } from './helpers';
+import { combo, resetDb, savedSearch, searchListing } from './helpers';
 import * as db from '../../src/db/queries';
 import DETAIL_HTML from '../fixtures/car-details-202601269420779-fullhistory.html?raw';
 
@@ -47,6 +47,39 @@ describe('GET /api/listings/:advertId/detail', () => {
     expect(res.status).toBe(400);
     // Must not reach AutoTrader with a rubbish id.
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('records a sold advert and stops showing it', async () => {
+    await db.upsertSearch(env.DB, savedSearch());
+    await db.upsertSearchListing(env.DB, searchListing({ advertId: '202601269420779' }));
+    const runId = await db.startRun(env.DB, 's1');
+    await db.linkListingToCombo(env.DB, 's1', '202601269420779', combo(), runId);
+    await db.finishRun(env.DB, runId, {
+      pagesFetched: 1,
+      listingsSeen: 1,
+      newCount: 1,
+      priceDropCount: 0,
+    });
+    expect(await db.getResults(env.DB, 's1')).toHaveLength(1);
+
+    // The page still renders — it just has no advert in it any more.
+    const hydration = JSON.stringify({ loaderData: { 'car-details': {} } });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        `<script>window.__staticRouterHydrationData = JSON.parse(${JSON.stringify(hydration)})</script>`,
+        { status: 200 },
+      ),
+    );
+
+    const res = await call('/api/listings/202601269420779/detail');
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as any).gone).toBe(true);
+
+    await Promise.all(waited.splice(0));
+
+    expect(await db.getResults(env.DB, 's1')).toHaveLength(0);
+    expect(await db.getResults(env.DB, 's1', { includeGone: true })).toHaveLength(1);
+    expect(await db.countGone(env.DB, 's1')).toBe(1);
   });
 
   it('says plainly when the advert has sold rather than reporting a failure', async () => {

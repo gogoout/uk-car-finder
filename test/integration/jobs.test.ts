@@ -140,6 +140,85 @@ describe('refreshSearch', () => {
   });
 });
 
+describe('adverts that have gone', () => {
+  const soldPage = () => {
+    const hydration = JSON.stringify({ loaderData: { 'car-details': {} } });
+    return {
+      ok: true,
+      status: 200,
+      text: async () =>
+        `<script>window.__staticRouterHydrationData = JSON.parse(${JSON.stringify(hydration)})</script>`,
+    } as Response;
+  };
+
+  it('marks a sold advert and takes it off the queue instead of retrying', async () => {
+    const search = savedSearch();
+    await db.upsertSearch(DB, search);
+    await refreshSearch(DB, search, {
+      fetchImpl: vi.fn().mockResolvedValue(gatewayPage(['1'])),
+      delayMs: 0,
+    });
+
+    const result = await drainDetailQueue(DB, {
+      fetchImpl: vi.fn().mockResolvedValue(soldPage()),
+      delayMs: 0,
+    });
+
+    expect(result.gone).toBe(1);
+    // Settled, not failed: retrying a sold advert every quarter of an hour
+    // achieves nothing.
+    expect(result.failed).toBe(0);
+    expect(result.remaining).toBe(0);
+    expect(await db.getResults(DB, 's1')).toHaveLength(0);
+    expect(await db.getResults(DB, 's1', { includeGone: true })).toHaveLength(1);
+  });
+
+  it('brings a relisted car back', async () => {
+    const search = savedSearch();
+    await db.upsertSearch(DB, search);
+    await refreshSearch(DB, search, {
+      fetchImpl: vi.fn().mockResolvedValue(gatewayPage(['1'])),
+      delayMs: 0,
+    });
+    await drainDetailQueue(DB, { fetchImpl: vi.fn().mockResolvedValue(soldPage()), delayMs: 0 });
+    expect(await db.getResults(DB, 's1')).toHaveLength(0);
+
+    // Seeing it in the search results again is proof enough that it is back.
+    await refreshSearch(DB, search, {
+      fetchImpl: vi.fn().mockResolvedValue(gatewayPage(['1'])),
+      delayMs: 0,
+    });
+
+    expect(await db.getResults(DB, 's1')).toHaveLength(1);
+  });
+
+  it('queues the cars a run stopped returning, so they can be checked', async () => {
+    const search = savedSearch();
+    await db.upsertSearch(DB, search);
+    await refreshSearch(DB, search, {
+      fetchImpl: vi.fn().mockResolvedValue(gatewayPage(['1', '2'])),
+      delayMs: 0,
+    });
+    // Start from an empty queue, without pretending either car has gone.
+    await db.dequeueDetail(DB, '1');
+    await db.dequeueDetail(DB, '2');
+    expect(await db.queueDepth(DB)).toBe(0);
+
+    // A later run returns only one of them. Absence is a hint, not a verdict,
+    // so the missing car is queued for a detail fetch rather than written off.
+    await refreshSearch(DB, search, {
+      fetchImpl: vi.fn().mockResolvedValue(gatewayPage(['1'])),
+      delayMs: 0,
+    });
+
+    const queued = await DB.prepare('SELECT advert_id FROM fetch_queue').all<{ advert_id: string }>();
+    expect(queued.results.map((r) => r.advert_id)).toEqual(['2']);
+    // And nothing is written off on absence alone.
+    expect(await db.getResults(DB, 's1', { includeGone: true })).toHaveLength(2);
+    expect(await db.countGone(DB, 's1')).toBe(0);
+  });
+});
+
 describe('a switched-off combination', () => {
   const off = (id: string, label: string) =>
     combo({ make: ['MAZDA'], model: ['Mazda2'] }, { id, label, enabled: false });
@@ -296,7 +375,9 @@ describe('drainDetailQueue', () => {
 
     const fetchImpl = vi.fn().mockImplementation((url: string) =>
       url.includes('bad')
-        ? Promise.resolve({ ok: false, status: 404 } as Response)
+        ? // A 500 is AutoTrader having a bad minute; a 404 would mean the advert
+          // has gone, which is settled rather than retryable.
+          Promise.resolve({ ok: false, status: 500 } as Response)
         : Promise.resolve({ ok: true, status: 200, text: async () => DETAIL_HTML } as Response),
     );
 
@@ -309,7 +390,7 @@ describe('drainDetailQueue', () => {
       .bind('bad')
       .first<any>();
     expect(row.attempts).toBe(1);
-    expect(row.last_error).toContain('404');
+    expect(row.last_error).toContain('500');
   });
 
   it('respects the batch size so a big backlog cannot blow the subrequest budget', async () => {
