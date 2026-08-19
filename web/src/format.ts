@@ -6,6 +6,24 @@ export const money = (value: number | null | undefined): string =>
 export const miles = (value: number | null | undefined): string =>
   value === null || value === undefined ? '—' : `${value.toLocaleString('en-GB')} miles`;
 
+/** DVSA and MOT dates are ISO; show them the way a UK buyer reads them. */
+export function shortDate(value: string | null | undefined): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** Month and year only, for a badge that has to stay short. */
+export function monthYear(value: string | null | undefined): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+}
+
 export function relativeTime(iso: string | null): string {
   if (!iso) return 'never';
   const diffMs = Date.now() - new Date(iso).getTime();

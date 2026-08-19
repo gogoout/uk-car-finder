@@ -79,11 +79,6 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
     await load();
   };
 
-  const saveVrm = async (advertId: string, vrm: string) => {
-    await api.setVrm(advertId, vrm);
-    await load();
-  };
-
   const visible = useMemo(() => {
     if (!data) return [];
     let listings = data.results;
@@ -91,6 +86,10 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
     if (onlyStarred) listings = listings.filter((l) => l.starred);
     return sortResults(listings, sort);
   }, [data, sort, onlyNew, onlyStarred]);
+
+  // Kept as an id, not the row itself, so a reload after starring or saving a
+  // plate shows the modal the fresh listing rather than a stale copy.
+  const openListing = data?.results.find((l) => l.advertId === openAdvertId) ?? null;
 
   const newCount = data?.results.filter((l) => l.isNew).length ?? 0;
   const dropCount = data?.results.filter((l) => l.priceDrop !== null).length ?? 0;
@@ -249,7 +248,6 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
               key={listing.advertId}
               listing={listing}
               onToggleStar={toggleStar}
-              onSetVrm={saveVrm}
               onOpen={setOpenAdvertId}
               onDiscard={discard}
             />
@@ -258,7 +256,12 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
       )}
 
       {openAdvertId && (
-        <ListingModal advertId={openAdvertId} onClose={() => setOpenAdvertId(null)} />
+        <ListingModal
+          advertId={openAdvertId}
+          vrm={openListing?.vrm ?? null}
+          onVrmSaved={() => void load()}
+          onClose={() => setOpenAdvertId(null)}
+        />
       )}
     </>
   );

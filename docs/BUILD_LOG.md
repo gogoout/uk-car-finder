@@ -5,6 +5,75 @@ discovered about AutoTrader that aren't obvious from the code. Newest first.
 
 ---
 
+## 2026-08-19 — MOT history: the odometer as evidence
+
+The DVSA credentials arrived, which exposed how lopsided the feature was: the
+OAuth flow, the lookup and a route had all been written months earlier, and
+nothing in the SPA ever called any of it. A plate typed on a starred card was
+saved and then used for nothing.
+
+### What the panel is actually for
+
+Two questions the advert cannot answer:
+
+- **Does the odometer ever go backwards?** Consecutive MOTs are the only public
+  mileage record a private buyer can check.
+- **Does the advertised mileage agree with the last test?** A car can only gain
+  miles after a test, so an advert *below* the last reading is the direction
+  that matters. Above it is just time passing.
+
+A third fell out for free: DVSA returns the make for a plate, so a mistyped
+registration is caught rather than presented as this car's history.
+
+### Two bugs found while splitting fetch from derive
+
+- **Kilometre readings were read as miles.** `odometerUnit` is `KM` on some
+  tests — usually an import. A 72,000 km reading among mile readings looks like
+  the odometer leapt 32,000 miles and then fell back, which fabricates a
+  clocking warning on an honest car. Now converted before comparison.
+- **`completedDate` has two formats.** Current records are ISO; older ones are
+  dotted (`2018.05.12 10:57:24`). One vehicle's history spans both eras, and
+  `new Date()` returns Invalid Date for the older form.
+
+### Storage: the payload, not the verdict
+
+Same rule as `advert_text`, and the table for it already existed in the initial
+migration. DVSA's response is stored verbatim per plate; the timeline, the
+clocking flag and the mileage comparison are computed on every read. Tightening
+the clocking rule later re-judges every car at once — no migration, no rows left
+carrying an answer from an older version of the code.
+
+A week's TTL for data that changes annually, with an explicit re-check in the
+panel, and a stale copy served when DVSA is unreachable — last week's MOT
+history is the same MOT history.
+
+The card gets a small derived summary; the full test list is fetched only when
+the modal opens. Cars with no plate never join the MOT table at all.
+
+### Failure modes get their own sentences
+
+No credentials (501), no DVSA record for that plate (404) and DVSA being down
+(502) previously collapsed into one 502 "lookup failed". They mean entirely
+different things to someone standing in a car park, so they now read
+differently.
+
+### Two incidental fixes
+
+- `setVrm` used to **upsert** into `starred`, so saving a plate silently
+  shortlisted the car. Now that a plate can be entered from the modal on any
+  car, it updates the shortlist row only if one already exists.
+- The card's plate box, which only appeared once a car was starred, is gone —
+  the modal takes a plate on any car and shows the answer in the same place.
+
+### Testing
+
+37 new tests. The route tests stub `fetch` **by URL rather than call order**:
+the OAuth token is cached for the life of the module, so after the first test
+the token request never happens and an ordered stub hands the token response to
+the MOT call instead — which fails as a *passing* 200 with an empty history.
+
+---
+
 ## 2026-08-11 — Import badges, and storing inputs rather than outputs
 
 Two adverts looked wrong and neither actually was:
@@ -616,5 +685,5 @@ thing that will detect it.
 - Replace `database_id` in `wrangler.jsonc` with the real one from
   `wrangler d1 create uk-car-finder`, then deploy.
 - Turn on Cloudflare Access for the Worker in the dashboard.
-- Register for the DVSA MOT History API; the code path is written and gated
-  behind `isMotConfigured()`, so it activates as soon as the secrets are set.
+- ~~Register for the DVSA MOT History API~~ — done 2026-08-19; the panel and
+  the per-plate cache landed with it.

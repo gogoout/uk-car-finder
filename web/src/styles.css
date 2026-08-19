@@ -548,3 +548,14 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
   border-top: 1px solid var(--border);
   background: var(--surface-2);
 }
+
+/* MOT history, in the listing modal. */
+.mot-tests { display: grid; gap: 10px; }
+.mot-test {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+}
+.mot-defects { margin: 6px 0 0; padding-left: 16px; display: grid; gap: 4px; }
+.mot-defects li { line-height: 1.5; }

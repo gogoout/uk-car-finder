@@ -133,19 +133,28 @@ curl "http://localhost:8787/__scheduled?cron=*/15+*+*+*+*"  # drain detail queue
 ### MOT history (optional)
 
 AutoTrader never publishes the registration plate, so MOT lookups run only for
-cars you shortlist and enter a plate for. Register for the
+cars you enter a plate for — in the listing modal, which then remembers it.
+
+What the panel is for: an odometer that reads lower than an earlier test, and an
+advertised mileage the last MOT contradicts. Both surface as badges on the card
+too. DVSA's response is cached per plate for a week (the `mot_history` table)
+and every verdict is derived from that stored payload on read, so the panel
+offers an explicit re-check for the day you want to be certain.
+
+Register for the
 [DVSA MOT History API](https://documentation.history.mot.api.gov.uk/mot-history-api/register),
-then:
+then, for production:
 
 ```bash
-wrangler secret put DVSA_CLIENT_ID
-wrangler secret put DVSA_CLIENT_SECRET
-wrangler secret put DVSA_API_KEY
-wrangler secret put DVSA_TOKEN_URL
+pnpm exec wrangler secret put DVSA_CLIENT_ID
+pnpm exec wrangler secret put DVSA_CLIENT_SECRET
+pnpm exec wrangler secret put DVSA_API_KEY
+pnpm exec wrangler secret put DVSA_TOKEN_URL
 ```
 
-See `.dev.vars.example`. Without them the MOT endpoint returns 501 and
-everything else works normally.
+Locally, copy `.dev.vars.example` to `.dev.vars` and fill the same four values
+in — it is gitignored. `GET /api/health` reports `motConfigured`. Without the
+credentials the MOT panel says so plainly and everything else works normally.
 
 ## Commands
 

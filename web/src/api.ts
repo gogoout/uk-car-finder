@@ -1,8 +1,26 @@
-import type { Combo, FilterSelections, ResultListing, SavedSearch } from '../../src/types';
+import type {
+  Combo,
+  FilterSelections,
+  MotHistory,
+  MotSummary,
+  MotTest,
+  ResultListing,
+  SavedSearch,
+} from '../../src/types';
 import type { FacetData } from '../../src/autotrader/facets';
 import type { FullDetail } from '../../src/autotrader/fullDetail';
 
-export type { Combo, FacetData, FilterSelections, FullDetail, ResultListing, SavedSearch };
+export type {
+  Combo,
+  FacetData,
+  FilterSelections,
+  FullDetail,
+  MotHistory,
+  MotSummary,
+  MotTest,
+  ResultListing,
+  SavedSearch,
+};
 
 export interface RunRow {
   id: number;
@@ -23,6 +41,21 @@ export interface ResultsResponse {
   discardedCount: number;
 }
 
+/**
+ * Carries the status through, because some failures are not errors to apologise
+ * for: an MOT lookup with no credentials (501) or no DVSA record (404) both
+ * need their own wording rather than a generic "failed".
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     ...init,
@@ -30,7 +63,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `Request failed with ${res.status}`);
+    throw new ApiError(body.error ?? `Request failed with ${res.status}`, res.status);
   }
   return res.json() as Promise<T>;
 }
@@ -59,6 +92,13 @@ export const api = {
   /** Everything AutoTrader publishes about one advert, fetched on demand. */
   getListingDetail: (advertId: string) =>
     request<FullDetail>(`/api/listings/${advertId}/detail`),
+
+  /**
+   * MOT history for a car, compared against what the advert claims. Served
+   * from the cached DVSA payload unless `refresh` forces a new lookup.
+   */
+  getMot: (advertId: string, refresh = false) =>
+    request<MotHistory>(`/api/listings/${advertId}/mot${refresh ? '?refresh=1' : ''}`),
 
   listSearches: () => request<SavedSearch[]>('/api/searches'),
 

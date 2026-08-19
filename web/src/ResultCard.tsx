@@ -1,10 +1,10 @@
-import { useState } from 'react';
 import type { ResultListing } from './api';
 import { expandImageUrl } from '../../src/autotrader/fullDetail';
 import { Star, Undo2, X } from 'lucide-react';
 import {
   miles,
   money,
+  monthYear,
   PRICE_LABELS,
   priceTone,
   relativeTime,
@@ -15,19 +15,16 @@ import {
 export function ResultCard({
   listing,
   onToggleStar,
-  onSetVrm,
   onOpen,
   onDiscard,
 }: {
   listing: ResultListing;
   onToggleStar: (advertId: string, starred: boolean) => void;
-  onSetVrm: (advertId: string, vrm: string) => void;
   onOpen: (advertId: string) => void;
   onDiscard: (advertId: string, discarded: boolean) => void;
 }) {
-  const [vrmDraft, setVrmDraft] = useState(listing.vrm ?? '');
-
   const enriched = listing.detailFetchedAt !== null;
+  const mot = listing.motSummary;
 
   return (
     <article
@@ -143,6 +140,31 @@ export function ResultCard({
         {listing.motStatus && <span className="badge">{listing.motStatus}</span>}
       </div>
 
+      {/* Only present once you have entered a plate. The two warnings are the
+          reason for looking one up: an odometer that goes backwards, and an
+          advertised mileage the last MOT contradicts. */}
+      {mot && (
+        <div className="badges">
+          {mot.possibleClocking && <span className="badge bad">Possible clocking</span>}
+          {mot.mileageMismatch !== null && (
+            <span
+              className="badge bad"
+              title={`Last MOT read ${miles(mot.latestOdometer)}; the advert says ${miles(listing.mileage)}`}
+            >
+              MOT reads {miles(mot.mileageMismatch)} more
+            </span>
+          )}
+          {mot.plateMismatch && (
+            <span className="badge warn" title={`DVSA has this plate as a ${mot.plateMismatch}`}>
+              Plate mismatch
+            </span>
+          )}
+          {mot.expiryDate && (
+            <span className="badge">MOT to {monthYear(mot.expiryDate)}</span>
+          )}
+        </div>
+      )}
+
       <div className="badges">
         {listing.matchedCombos.map((label) => (
           <span key={label} className="badge combo">
@@ -163,24 +185,6 @@ export function ResultCard({
         <div className="tiny muted">Details still queued — service history follows shortly.</div>
       )}
 
-      {listing.starred && (
-        <div className="row">
-          <input
-            value={vrmDraft}
-            placeholder="Reg plate for MOT history"
-            aria-label="Registration plate"
-            onChange={(e) => setVrmDraft(e.target.value)}
-            style={{ flex: 1, minWidth: 140 }}
-          />
-          <button
-            type="button"
-            onClick={() => onSetVrm(listing.advertId, vrmDraft)}
-            disabled={!vrmDraft.trim() || vrmDraft.trim().toUpperCase() === listing.vrm}
-          >
-            Save
-          </button>
-        </div>
-      )}
     </article>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import { Gallery } from './Gallery';
 import { CopyButton } from './CopyButton';
+import { MotPanel } from './MotPanel';
 import { PRICE_LABELS, priceTone, SERVICE_LABELS, serviceTone } from './format';
 import type { FullDetail } from '../../src/autotrader/fullDetail';
 import { ChevronDown, ChevronRight, ExternalLink, X } from 'lucide-react';
@@ -41,7 +42,18 @@ function Section({
  * are whatever they are right now — including the advert having sold, which is
  * worth knowing before you drive to see it.
  */
-export function ListingModal({ advertId, onClose }: { advertId: string; onClose: () => void }) {
+export function ListingModal({
+  advertId,
+  vrm,
+  onVrmSaved,
+  onClose,
+}: {
+  advertId: string;
+  /** Plate on file for this car, if you have entered one. */
+  vrm: string | null;
+  onVrmSaved: (vrm: string) => void;
+  onClose: () => void;
+}) {
   const [detail, setDetail] = useState<FullDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -72,6 +84,14 @@ export function ListingModal({ advertId, onClose }: { advertId: string; onClose:
   }, [onClose]);
 
   const heading = detail?.title || 'Loading…';
+
+  // Rendered in both branches below: MOT history comes from DVSA, so it is
+  // still worth having on the days AutoTrader's advert won't load.
+  const motSection = (
+    <Section title="MOT history" defaultOpen={vrm !== null}>
+      <MotPanel advertId={advertId} vrm={vrm} onVrmSaved={onVrmSaved} />
+    </Section>
+  );
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -106,6 +126,8 @@ export function ListingModal({ advertId, onClose }: { advertId: string; onClose:
               </div>
             </div>
           )}
+
+          {error && motSection}
 
           {!detail && !error && <div className="modal-loading muted small">Loading advert…</div>}
 
@@ -236,6 +258,8 @@ export function ListingModal({ advertId, onClose }: { advertId: string; onClose:
                   {detail.sellerPhone && <div className="small">{detail.sellerPhone}</div>}
                 </Section>
               )}
+
+              {motSection}
 
               <div className="row">
                 <a className="btn" href={detail.detailUrl} target="_blank" rel="noreferrer">
