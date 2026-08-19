@@ -482,7 +482,9 @@ interface ResultRow {
   first_seen_run_id: number | null;
   high_price: number | null;
   starred: number;
+  star_note: string | null;
   discarded: number;
+  discard_reason: string | null;
   advert_text: string | null;
 }
 
@@ -512,7 +514,9 @@ export async function getResults(
               MIN(sl.first_seen_run_id) AS first_seen_run_id,
               (SELECT MAX(price) FROM listing_prices p WHERE p.advert_id = l.advert_id) AS high_price,
               (SELECT COUNT(*) FROM starred s WHERE s.advert_id = l.advert_id) AS starred,
-              (SELECT COUNT(*) FROM discarded d WHERE d.advert_id = l.advert_id) AS discarded
+              (SELECT s.notes FROM starred s WHERE s.advert_id = l.advert_id) AS star_note,
+              (SELECT COUNT(*) FROM discarded d WHERE d.advert_id = l.advert_id) AS discarded,
+              (SELECT d.reason FROM discarded d WHERE d.advert_id = l.advert_id) AS discard_reason
        FROM listings l
        JOIN search_listings sl ON sl.advert_id = l.advert_id
        WHERE sl.search_id = ?
@@ -568,7 +572,9 @@ export async function getResults(
       priceDrop,
       previousPrice: priceDrop !== null ? row.high_price : null,
       starred: row.starred > 0,
+      starNote: row.star_note,
       discarded: row.discarded > 0,
+      discardReason: row.discard_reason,
       // Derived, never stored: changing mentionsImport takes effect on every
       // listing at once rather than leaving old rows with a stale answer.
       advertText: row.advert_text,
@@ -639,21 +645,40 @@ export async function getResults(
 
 /* -------------------------------------------------------------------- starring */
 
+/**
+ * `note` is tri-state on purpose: a string writes it, `null` clears it, and
+ * `undefined` leaves whatever is there alone — so toggling the star off and on
+ * again doesn't silently wipe the reason you typed a fortnight ago.
+ */
 export async function setStarred(
   db: D1Database,
   advertId: string,
   starred: boolean,
+  note?: string | null,
 ): Promise<void> {
-  if (starred) {
+  if (!starred) {
+    await db.prepare('DELETE FROM starred WHERE advert_id = ?').bind(advertId).run();
+    return;
+  }
+
+  if (note === undefined) {
+    // Starring without saying why: create the row, leave any note alone.
     await db
       .prepare(
         'INSERT INTO starred (advert_id, starred_at) VALUES (?, ?) ON CONFLICT(advert_id) DO NOTHING',
       )
       .bind(advertId, now())
       .run();
-  } else {
-    await db.prepare('DELETE FROM starred WHERE advert_id = ?').bind(advertId).run();
+    return;
   }
+
+  await db
+    .prepare(
+      `INSERT INTO starred (advert_id, notes, starred_at) VALUES (?, ?, ?)
+       ON CONFLICT(advert_id) DO UPDATE SET notes = excluded.notes`,
+    )
+    .bind(advertId, note, now())
+    .run();
 }
 
 /**
@@ -664,17 +689,30 @@ export async function setDiscarded(
   db: D1Database,
   advertId: string,
   discarded: boolean,
+  reason?: string | null,
 ): Promise<void> {
-  if (discarded) {
+  if (!discarded) {
+    await db.prepare('DELETE FROM discarded WHERE advert_id = ?').bind(advertId).run();
+    return;
+  }
+
+  if (reason === undefined) {
     await db
       .prepare(
         'INSERT INTO discarded (advert_id, discarded_at) VALUES (?, ?) ON CONFLICT(advert_id) DO NOTHING',
       )
       .bind(advertId, now())
       .run();
-  } else {
-    await db.prepare('DELETE FROM discarded WHERE advert_id = ?').bind(advertId).run();
+    return;
   }
+
+  await db
+    .prepare(
+      `INSERT INTO discarded (advert_id, reason, discarded_at) VALUES (?, ?, ?)
+       ON CONFLICT(advert_id) DO UPDATE SET reason = excluded.reason`,
+    )
+    .bind(advertId, reason, now())
+    .run();
 }
 
 /** How many of a search's results are currently hidden as discarded. */

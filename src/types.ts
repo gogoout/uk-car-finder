@@ -214,8 +214,12 @@ export interface ResultListing
   priceDrop: number | null;
   previousPrice: number | null;
   starred: boolean;
+  /** Why you shortlisted it, in your words. Null until you write one. */
+  starNote: string | null;
   /** Ruled out by you; hidden from results unless you ask to see them. */
   discarded: boolean;
+  /** Why you ruled it out — the thing you'll have forgotten in a fortnight. */
+  discardReason: string | null;
   /**
    * Derived from `advertText` on read, never stored — so changing the detection
    * applies to every listing at once.

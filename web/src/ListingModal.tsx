@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import { Gallery } from './Gallery';
 import { CopyButton } from './CopyButton';
+import { NoteField } from './NoteField';
 import { MotPanel } from './MotPanel';
 import { PRICE_LABELS, priceTone, SERVICE_LABELS, serviceTone } from './format';
 import type { FullDetail } from '../../src/autotrader/fullDetail';
@@ -48,6 +49,8 @@ export function ListingModal({
   onVrmSaved,
   starred,
   discarded,
+  starNote,
+  discardReason,
   onToggleStar,
   onDiscard,
   onClose,
@@ -58,10 +61,21 @@ export function ListingModal({
   onVrmSaved: (vrm: string) => void;
   starred: boolean;
   discarded: boolean;
-  onToggleStar: (advertId: string, starred: boolean) => void;
-  onDiscard: (advertId: string, discarded: boolean) => void;
+  /** Your own words, from when you made the decision. */
+  starNote: string | null;
+  discardReason: string | null;
+  onToggleStar: (advertId: string, starred: boolean, note?: string | null) => void;
+  onDiscard: (advertId: string, discarded: boolean, reason?: string | null) => void;
   onClose: () => void;
 }) {
+  // Held locally once the sheet is open, because discarding a car removes it
+  // from the list behind — the props would snap back to "not discarded" while
+  // you are still looking at it.
+  const [isStarred, setIsStarred] = useState(starred);
+  const [isDiscarded, setIsDiscarded] = useState(discarded);
+  const [note, setNote] = useState(starNote);
+  const [reason, setReason] = useState(discardReason);
+  const [asking, setAsking] = useState<'star' | 'discard' | null>(null);
   const [detail, setDetail] = useState<FullDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -268,27 +282,65 @@ export function ListingModal({
             Close stays top-right: shutting the sheet is not a decision about
             the car, and it must not sit next to one that is. */}
         <footer className="modal-foot">
+          {/* Asked at the moment of the decision, because that is the only
+              moment you know the answer. Never required: the decision is
+              already saved by the time the box appears. */}
+          {(isStarred || isDiscarded) && (
+            <div className="modal-foot-notes">
+              {isStarred && (
+                <NoteField
+                  value={note}
+                  icon={<Star size={11} fill="currentColor" />}
+                  placeholder="Why shortlisted?"
+                  startEditing={asking === 'star'}
+                  onSave={(next) => {
+                    setNote(next);
+                    onToggleStar(advertId, true, next);
+                  }}
+                />
+              )}
+              {isDiscarded && (
+                <NoteField
+                  value={reason}
+                  icon={<Trash2 size={11} />}
+                  placeholder="Why ruled out?"
+                  startEditing={asking === 'discard'}
+                  onSave={(next) => {
+                    setReason(next);
+                    onDiscard(advertId, true, next);
+                  }}
+                />
+              )}
+            </div>
+          )}
+
+          <div className="modal-foot-actions">
           <button
             type="button"
-            className={`btn${starred ? ' is-on' : ''}`}
-            aria-pressed={starred}
-            onClick={() => onToggleStar(advertId, !starred)}
+            className={`btn${isStarred ? ' is-on' : ''}`}
+            aria-pressed={isStarred}
+            onClick={() => {
+              setIsStarred(!isStarred);
+              setAsking(isStarred ? null : 'star');
+              onToggleStar(advertId, !isStarred);
+            }}
           >
-            <Star size={16} aria-hidden="true" fill={starred ? 'currentColor' : 'none'} />
-            {starred ? 'Shortlisted' : 'Shortlist'}
+            <Star size={16} aria-hidden="true" fill={isStarred ? 'currentColor' : 'none'} />
+            {isStarred ? 'Shortlisted' : 'Shortlist'}
           </button>
 
           <button
             type="button"
             className="btn danger"
             onClick={() => {
-              onDiscard(advertId, !discarded);
-              // Ruling a car out is the end of looking at it; putting one back
-              // is not, so only the discard closes the sheet.
-              if (!discarded) onClose();
+              setIsDiscarded(!isDiscarded);
+              // The sheet stays open on a discard now: the reason box appears
+              // right here, and closing first would leave nowhere to type it.
+              setAsking(isDiscarded ? null : 'discard');
+              onDiscard(advertId, !isDiscarded);
             }}
           >
-            {discarded ? (
+            {isDiscarded ? (
               <>
                 <Undo2 size={16} aria-hidden="true" />
                 Restore
@@ -319,6 +371,7 @@ export function ListingModal({
             label="Copy link"
             copiedLabel="Copied ✓"
           />
+          </div>
         </footer>
       </div>
     </div>

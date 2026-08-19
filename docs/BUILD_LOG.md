@@ -110,6 +110,33 @@ The link out to AutoTrader moved into the footer too, built from the advert id
 rather than the parsed page, so it still works on the days their page won't
 parse — which is exactly when you want it.
 
+### Reasons, asked at the moment you know them
+
+A shortlisted car and a rejected one both raise the same question a fortnight
+later: why? Star and discard now each take a one-line reason, shown on the card
+and in the modal footer, edited in place by clicking it.
+
+Nothing blocks: the decision is saved before the box appears, and typing nothing
+is a normal outcome. The box opens focused on the click that made the decision,
+because that is the only moment the answer is in your head.
+
+`starred.notes` had been in the schema since the initial migration and never
+used; `discarded` needed a column. Both live with the decision rather than on
+`listings`, so undoing a decision takes its reason with it — carrying an old
+reason into a fresh decision would be putting words in your mouth.
+
+Absent and blank are kept apart all the way down: omitting the note leaves the
+stored one alone, sending an empty one clears it. Without that, the star button
+would wipe the reason every time it was toggled. The first attempt got this
+wrong — `COALESCE(?, notes)` collapses "no opinion" and "clear it" into the same
+bound null — so the two cases are now separate statements.
+
+Discarding from the modal no longer closes it, which reverses what it did an
+hour earlier: the reason box appears in the footer, and closing first would
+leave nowhere to type. The modal also holds its own star and discard state once
+open, because discarding removes the car from the list behind it and the props
+would otherwise snap back to "not discarded" while you were still looking at it.
+
 ### The bug this uncovered
 
 `migrateCombo` rebuilt an already-migrated combo as `{id, label, filters}` and

@@ -120,17 +120,21 @@ export const api = {
 
   refresh: (id: string) => request<unknown>(`/api/searches/${id}/refresh`, { method: 'POST' }),
 
-  setStarred: (advertId: string, starred: boolean) =>
+  /**
+   * `note` omitted leaves any stored reason alone, so toggling the star does
+   * not discard what you wrote about the car last week.
+   */
+  setStarred: (advertId: string, starred: boolean, note?: string | null) =>
     request<{ ok: true }>(`/api/listings/${advertId}/star`, {
       method: 'POST',
-      body: JSON.stringify({ starred }),
+      body: JSON.stringify(note === undefined ? { starred } : { starred, note }),
     }),
 
   /** Rule a car out, hiding it from every search that finds it. */
-  setDiscarded: (advertId: string, discarded: boolean) =>
+  setDiscarded: (advertId: string, discarded: boolean, reason?: string | null) =>
     request<{ ok: true }>(`/api/listings/${advertId}/discard`, {
       method: 'POST',
-      body: JSON.stringify({ discarded }),
+      body: JSON.stringify(reason === undefined ? { discarded } : { discarded, reason }),
     }),
 
   setVrm: (advertId: string, vrm: string | null) =>

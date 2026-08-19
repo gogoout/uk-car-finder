@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import type { ResultListing } from './api';
+import { NoteField } from './NoteField';
 import { expandImageUrl } from '../../src/autotrader/fullDetail';
 import { Star, Trash2, Undo2 } from 'lucide-react';
 import {
@@ -19,12 +21,15 @@ export function ResultCard({
   onDiscard,
 }: {
   listing: ResultListing;
-  onToggleStar: (advertId: string, starred: boolean) => void;
+  onToggleStar: (advertId: string, starred: boolean, note?: string | null) => void;
   onOpen: (advertId: string) => void;
-  onDiscard: (advertId: string, discarded: boolean) => void;
+  onDiscard: (advertId: string, discarded: boolean, reason?: string | null) => void;
 }) {
   const enriched = listing.detailFetchedAt !== null;
   const mot = listing.motSummary;
+  // Which reason box to open focused, set by the click that just changed the
+  // decision — you know why at that moment and nowhere else.
+  const [asking, setAsking] = useState<'star' | 'discard' | null>(null);
 
   return (
     <article
@@ -65,7 +70,10 @@ export function ResultCard({
             className="icon"
             aria-label={listing.starred ? 'Remove from shortlist' : 'Add to shortlist'}
             aria-pressed={listing.starred}
-            onClick={() => onToggleStar(listing.advertId, !listing.starred)}
+            onClick={() => {
+              onToggleStar(listing.advertId, !listing.starred);
+              setAsking(listing.starred ? null : 'star');
+            }}
           >
             <Star size={18} aria-hidden="true" fill={listing.starred ? 'currentColor' : 'none'} />
           </button>
@@ -73,7 +81,10 @@ export function ResultCard({
             type="button"
             className="icon"
             aria-label={listing.discarded ? 'Restore this car' : 'Discard this car'}
-            onClick={() => onDiscard(listing.advertId, !listing.discarded)}
+            onClick={() => {
+              onDiscard(listing.advertId, !listing.discarded);
+              setAsking(listing.discarded ? null : 'discard');
+            }}
           >
             {/* A bin, not a cross: a cross is what closes things, and this
                 rules a car out. */}
@@ -174,6 +185,26 @@ export function ResultCard({
           </span>
         ))}
       </div>
+
+      {listing.starred && (
+        <NoteField
+          value={listing.starNote}
+          icon={<Star size={11} fill="currentColor" />}
+          placeholder="Why shortlisted?"
+          startEditing={asking === 'star'}
+          onSave={(note) => onToggleStar(listing.advertId, true, note)}
+        />
+      )}
+
+      {listing.discarded && (
+        <NoteField
+          value={listing.discardReason}
+          icon={<Trash2 size={11} />}
+          placeholder="Why ruled out?"
+          startEditing={asking === 'discard'}
+          onSave={(reason) => onDiscard(listing.advertId, true, reason)}
+        />
+      )}
 
       <div className="spread tiny muted">
         <span>

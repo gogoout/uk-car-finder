@@ -70,13 +70,13 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
     }
   };
 
-  const toggleStar = async (advertId: string, starred: boolean) => {
-    await api.setStarred(advertId, starred);
+  const toggleStar = async (advertId: string, starred: boolean, note?: string | null) => {
+    await api.setStarred(advertId, starred, note);
     await load();
   };
 
-  const discard = async (advertId: string, discarded: boolean) => {
-    await api.setDiscarded(advertId, discarded);
+  const discard = async (advertId: string, discarded: boolean, reason?: string | null) => {
+    await api.setDiscarded(advertId, discarded, reason);
     await load();
   };
 
@@ -267,6 +267,8 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
           onVrmSaved={() => void load()}
           starred={openListing?.starred ?? false}
           discarded={openListing?.discarded ?? false}
+          starNote={openListing?.starNote ?? null}
+          discardReason={openListing?.discardReason ?? null}
           onToggleStar={toggleStar}
           onDiscard={discard}
           onClose={() => setOpenAdvertId(null)}
