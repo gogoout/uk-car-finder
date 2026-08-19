@@ -14,6 +14,8 @@ import {
 import { migrateCombos } from './migrateCombo';
 import { storedListingMatches } from '../autotrader/match';
 import { mentionsImport } from '../autotrader/normalise';
+import { normalisePlate, summariseMot } from '../mot/dvsa';
+import { readMotCacheMany } from './motCache';
 
 const now = () => new Date().toISOString();
 
@@ -571,8 +573,25 @@ export async function getResults(
       advertText: row.advert_text,
       importMentioned: mentionsImport(row.advert_text),
       vrm: row.vrm,
+      // Filled in below, for the handful of cars with a plate on file.
+      motSummary: null,
     };
   });
+
+  // MOT verdicts, derived from the stored DVSA payload exactly like the import
+  // hint. Only cars you have entered a plate for join at all, so this is a
+  // short list however large the search is.
+  const plates = [...new Set(mapped.map((l) => l.vrm).filter((v): v is string => Boolean(v)))];
+  const motByPlate = await readMotCacheMany(db, plates);
+  for (const listing of mapped) {
+    const cached = listing.vrm ? motByPlate.get(listing.vrm) : undefined;
+    if (cached) {
+      listing.motSummary = summariseMot(cached.raw, {
+        mileage: listing.mileage,
+        make: listing.make,
+      });
+    }
+  }
 
   // Re-check every credit against the combo's current filters. A link is
   // written when a listing matches and is never revisited, so narrowing a combo
@@ -667,14 +686,30 @@ export async function countDiscarded(db: D1Database, searchId: string): Promise<
 }
 
 export async function setVrm(db: D1Database, advertId: string, vrm: string | null): Promise<void> {
-  const normalised = vrm ? vrm.toUpperCase().replace(/\s+/g, '') : null;
+  const normalised = vrm ? normalisePlate(vrm) : null;
   await db.batch([
     db.prepare('UPDATE listings SET vrm = ? WHERE advert_id = ?').bind(normalised, advertId),
-    db
-      .prepare(
-        `INSERT INTO starred (advert_id, vrm, starred_at) VALUES (?, ?, ?)
-         ON CONFLICT(advert_id) DO UPDATE SET vrm = excluded.vrm`,
-      )
-      .bind(advertId, normalised, now()),
+    // Keep the shortlist's copy in step, but never create the row: a plate can
+    // now be entered from the modal on any car, and typing one is not the same
+    // as shortlisting it.
+    db.prepare('UPDATE starred SET vrm = ? WHERE advert_id = ?').bind(normalised, advertId),
   ]);
+}
+
+/** What the MOT comparison needs to know about the car the plate belongs to. */
+export interface ListingFacts {
+  vrm: string | null;
+  mileage: number | null;
+  make: string | null;
+}
+
+export async function getListingFacts(
+  db: D1Database,
+  advertId: string,
+): Promise<ListingFacts | null> {
+  const row = await db
+    .prepare('SELECT vrm, mileage, make FROM listings WHERE advert_id = ?')
+    .bind(advertId)
+    .first<ListingFacts>();
+  return row ?? null;
 }

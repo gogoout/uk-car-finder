@@ -214,4 +214,99 @@ export interface ResultListing
    */
   importMentioned: boolean;
   vrm: string | null;
+  /**
+   * Derived on read from the cached DVSA response, and null until you enter a
+   * plate for this car. The card only needs the verdict; the full test history
+   * is fetched separately when the modal opens.
+   */
+  motSummary: MotSummary | null;
+}
+
+/* ------------------------------------------------------------------- MOT */
+
+/**
+ * DVSA's own shapes, kept as loose as their API is. Their payload is stored
+ * verbatim, so anything below is what we choose to read out of it — fields we
+ * don't name are still there in the cached row.
+ */
+export interface MotDefect {
+  text: string;
+  /** ADVISORY | MINOR | MAJOR | DANGEROUS | FAIL | PRS | USER ENTERED. */
+  type: string;
+  dangerous?: boolean;
+}
+
+export interface MotTest {
+  completedDate: string;
+  testResult: string;
+  /** Null on a failure, and on the COVID-extension records. */
+  expiryDate?: string | null;
+  /** Null when `odometerResultType` is UNREADABLE or NO_ODOMETER_READING. */
+  odometerValue?: string | null;
+  /** "MI" or "KM" today; older records use lowercase. */
+  odometerUnit?: string | null;
+  odometerResultType?: string | null;
+  motTestNumber?: string;
+  defects?: MotDefect[];
+}
+
+/** DVSA's response, stored exactly as received. */
+export interface MotRaw {
+  registration?: string;
+  make?: string;
+  model?: string;
+  firstUsedDate?: string;
+  fuelType?: string;
+  primaryColour?: string;
+  engineSize?: string;
+  motTests?: MotTest[];
+}
+
+/** One odometer reading, normalised to miles. */
+export interface MileageReading {
+  date: string;
+  miles: number;
+}
+
+/**
+ * The verdict, small enough to ship with every result card.
+ *
+ * Every field here is derived from the stored payload on read, so tightening
+ * the clocking rule later re-judges every car at once rather than leaving old
+ * rows holding an answer from an older version of the code.
+ */
+export interface MotSummary {
+  registration: string | null;
+  /** DVSA's own make and model for the plate, e.g. "MINI COOPER". */
+  vehicle: string | null;
+  lastTestDate: string | null;
+  /** Expiry of the most recent pass. */
+  expiryDate: string | null;
+  /** Latest odometer reading, in miles. */
+  latestOdometer: number | null;
+  testCount: number;
+  /** An odometer reading lower than an earlier one. */
+  possibleClocking: boolean;
+  /**
+   * Miles by which the last MOT reads *above* the advertised mileage. A car can
+   * only gain miles after a test, so this direction is the one that matters.
+   */
+  mileageMismatch: number | null;
+  /** Set when DVSA's make for this plate contradicts the advert's. */
+  plateMismatch: string | null;
+}
+
+/** The full history, for the modal. */
+export interface MotHistory extends MotSummary {
+  make: string | null;
+  model: string | null;
+  firstUsedDate: string | null;
+  fuelType: string | null;
+  /** Newest first, as DVSA returns them. */
+  tests: MotTest[];
+  /** Oldest first, for reading the odometer as a trend. */
+  mileageTimeline: MileageReading[];
+  /** When the cached copy was taken. */
+  fetchedAt: string;
+  source: 'cache' | 'network' | 'stale-fallback';
 }

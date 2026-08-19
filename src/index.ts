@@ -1,8 +1,10 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import * as db from './db/queries';
 import { refreshAllSearches, refreshSearch } from './jobs/refresh';
 import { drainDetailQueue } from './jobs/drain';
-import { fetchMotHistory, isMotConfigured } from './mot/dvsa';
+import { buildMotHistory, fetchMotRaw, isMotConfigured, MotNotFound, normalisePlate } from './mot/dvsa';
+import { getMotHistory } from './db/motCache';
 import { fetchFacets } from './autotrader/facets';
 import { fetchDetailPage } from './autotrader/gateway';
 import { extractAdvert } from './autotrader/detail';
@@ -313,19 +315,52 @@ app.put('/api/listings/:advertId/vrm', async (c) => {
 });
 
 /**
- * MOT history for a plate. AutoTrader doesn't publish the VRM, so this is
- * driven by what you type in on a starred car (occasionally pre-filled from a
- * dealer deep-link).
+ * MOT history.
+ *
+ * AutoTrader doesn't publish the VRM, so this is driven by the plate you type
+ * in (occasionally pre-filled from a dealer deep-link). DVSA's payload is
+ * cached per plate and everything shown is derived from it on read.
+ *
+ * The three failure modes are kept distinct because they need different words
+ * on screen: no credentials (501), no record for that plate (404), and DVSA
+ * being unreachable with nothing cached to fall back on (502).
  */
-app.get('/api/mot/:vrm', async (c) => {
+async function motResponse(
+  c: Context<{ Bindings: Env }>,
+  vrm: string,
+  advert: { mileage?: number | null; make?: string | null } = {},
+) {
   if (!isMotConfigured(c.env)) {
     return c.json({ error: 'DVSA MOT credentials are not configured' }, 501);
   }
+
+  const plate = normalisePlate(vrm);
   try {
-    return c.json(await fetchMotHistory(c.env, c.req.param('vrm')));
+    const result = await getMotHistory(c.env.DB, plate, (v) => fetchMotRaw(c.env, v), {
+      force: c.req.query('refresh') === '1',
+    });
+    return c.json(
+      buildMotHistory(result.raw, { fetchedAt: result.fetchedAt, source: result.source }, advert),
+    );
   } catch (err) {
+    if (err instanceof MotNotFound) return c.json({ error: err.message }, 404);
     return c.json({ error: err instanceof Error ? err.message : 'MOT lookup failed' }, 502);
   }
+}
+
+/** A bare plate lookup, with no advert to compare against. */
+app.get('/api/mot/:vrm', (c) => motResponse(c, c.req.param('vrm')));
+
+/**
+ * The MOT history of a car we hold, which is the useful form: knowing the
+ * advertised mileage and make is what turns the reading into a verdict.
+ */
+app.get('/api/listings/:advertId/mot', async (c) => {
+  const listing = await db.getListingFacts(c.env.DB, c.req.param('advertId'));
+  if (!listing) return c.json({ error: 'Unknown listing' }, 404);
+  if (!listing.vrm) return c.json({ error: 'No registration plate on file for this car' }, 400);
+
+  return motResponse(c, listing.vrm, { mileage: listing.mileage, make: listing.make });
 });
 
 // Anything else is the SPA — including /s/:id share links.
