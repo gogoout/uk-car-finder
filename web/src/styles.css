@@ -312,11 +312,13 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
 .modal-heading strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .modal-body {
+  /* Takes the space the header and footer don't; min-height:0 is what lets it
+     scroll inside the flex column instead of pushing the footer off-screen. */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 16px;
-  /* Clears the iOS home indicator. */
-  padding-bottom: calc(32px + env(safe-area-inset-bottom));
 }
 .modal-body > * + * { margin-top: 16px; }
 .modal-loading { padding: 40px 0; text-align: center; }
@@ -564,3 +566,18 @@ label > span { display: block; font-size: 12px; color: var(--muted); margin-bott
 .combo-card.is-off { opacity: 0.6; border-style: dashed; }
 .combo-card.is-off .combo-name { text-decoration: line-through; }
 .combo-off-badge { flex: none; }
+
+/* Modal footer: the decisions about the car, within thumb reach. Close stays
+   in the header, deliberately away from them. */
+.modal-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.modal-foot-spacer { flex: 1; }
+.modal-foot .btn { gap: 6px; }
+.modal-foot .btn.is-on { border-color: var(--accent); color: var(--accent); }

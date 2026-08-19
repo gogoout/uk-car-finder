@@ -92,6 +92,24 @@ parked combination is also exempt from the "needs a make" rule, on both the
 server and the editor's save button: it never runs, so it is allowed to sit
 half-built.
 
+### Modal footer, and a cross that meant two things
+
+The star and discard buttons only existed on the card, so deciding about a car
+meant closing the sheet you were deciding from. They now sit in a footer at the
+bottom of the modal, within thumb reach. Close stays top-right: shutting the
+sheet is not a decision about the car and should not sit beside one that is.
+
+Discarding closes the sheet — ruling a car out is the end of looking at it —
+while restoring one leaves it open.
+
+The discard icon was a cross, the same glyph as close, one meaning "put this
+away for good" and the other "put this away for now". It is a bin now, on the
+card as well.
+
+The link out to AutoTrader moved into the footer too, built from the advert id
+rather than the parsed page, so it still works on the days their page won't
+parse — which is exactly when you want it.
+
 ### The bug this uncovered
 
 `migrateCombo` rebuilt an already-migrated combo as `{id, label, filters}` and

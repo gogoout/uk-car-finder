@@ -1,6 +1,6 @@
 import type { ResultListing } from './api';
 import { expandImageUrl } from '../../src/autotrader/fullDetail';
-import { Star, Undo2, X } from 'lucide-react';
+import { Star, Trash2, Undo2 } from 'lucide-react';
 import {
   miles,
   money,
@@ -75,10 +75,12 @@ export function ResultCard({
             aria-label={listing.discarded ? 'Restore this car' : 'Discard this car'}
             onClick={() => onDiscard(listing.advertId, !listing.discarded)}
           >
+            {/* A bin, not a cross: a cross is what closes things, and this
+                rules a car out. */}
             {listing.discarded ? (
               <Undo2 size={18} aria-hidden="true" />
             ) : (
-              <X size={18} aria-hidden="true" />
+              <Trash2 size={18} aria-hidden="true" />
             )}
           </button>
         </div>

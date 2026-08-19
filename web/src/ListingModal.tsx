@@ -5,7 +5,7 @@ import { CopyButton } from './CopyButton';
 import { MotPanel } from './MotPanel';
 import { PRICE_LABELS, priceTone, SERVICE_LABELS, serviceTone } from './format';
 import type { FullDetail } from '../../src/autotrader/fullDetail';
-import { ChevronDown, ChevronRight, ExternalLink, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, Star, Trash2, Undo2, X } from 'lucide-react';
 
 /** Collapsible section, matching the accordion used by the filter editor. */
 function Section({
@@ -46,12 +46,20 @@ export function ListingModal({
   advertId,
   vrm,
   onVrmSaved,
+  starred,
+  discarded,
+  onToggleStar,
+  onDiscard,
   onClose,
 }: {
   advertId: string;
   /** Plate on file for this car, if you have entered one. */
   vrm: string | null;
   onVrmSaved: (vrm: string) => void;
+  starred: boolean;
+  discarded: boolean;
+  onToggleStar: (advertId: string, starred: boolean) => void;
+  onDiscard: (advertId: string, discarded: boolean) => void;
   onClose: () => void;
 }) {
   const [detail, setDetail] = useState<FullDetail | null>(null);
@@ -116,16 +124,7 @@ export function ListingModal({
         </header>
 
         <div className="modal-body">
-          {error && (
-            <div className="banner">
-              {error}
-              <div className="tiny" style={{ marginTop: 6 }}>
-                <a href={`https://www.autotrader.co.uk/car-details/${advertId}`} target="_blank" rel="noreferrer">
-                  Open on AutoTrader
-                </a>
-              </div>
-            </div>
-          )}
+          {error && <div className="banner">{error}</div>}
 
           {error && motSection}
 
@@ -260,17 +259,67 @@ export function ListingModal({
               )}
 
               {motSection}
-
-              <div className="row">
-                <a className="btn" href={detail.detailUrl} target="_blank" rel="noreferrer">
-                  View on AutoTrader
-                  <ExternalLink size={16} aria-hidden="true" />
-                </a>
-                <CopyButton value={detail.detailUrl} label="Copy link" copiedLabel="Copied ✓" />
-              </div>
             </>
           )}
         </div>
+
+        {/* The two decisions you make while looking at the photos, kept within
+            thumb reach at the bottom rather than at the end of a long scroll.
+            Close stays top-right: shutting the sheet is not a decision about
+            the car, and it must not sit next to one that is. */}
+        <footer className="modal-foot">
+          <button
+            type="button"
+            className={`btn${starred ? ' is-on' : ''}`}
+            aria-pressed={starred}
+            onClick={() => onToggleStar(advertId, !starred)}
+          >
+            <Star size={16} aria-hidden="true" fill={starred ? 'currentColor' : 'none'} />
+            {starred ? 'Shortlisted' : 'Shortlist'}
+          </button>
+
+          <button
+            type="button"
+            className="btn danger"
+            onClick={() => {
+              onDiscard(advertId, !discarded);
+              // Ruling a car out is the end of looking at it; putting one back
+              // is not, so only the discard closes the sheet.
+              if (!discarded) onClose();
+            }}
+          >
+            {discarded ? (
+              <>
+                <Undo2 size={16} aria-hidden="true" />
+                Restore
+              </>
+            ) : (
+              <>
+                <Trash2 size={16} aria-hidden="true" />
+                Discard
+              </>
+            )}
+          </button>
+
+          <span className="modal-foot-spacer" />
+
+          {/* Built from the id rather than the loaded advert, so the way out to
+              AutoTrader still works on the days their page won't parse. */}
+          <a
+            className="btn"
+            href={detail?.detailUrl ?? `https://www.autotrader.co.uk/car-details/${advertId}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            AutoTrader
+            <ExternalLink size={16} aria-hidden="true" />
+          </a>
+          <CopyButton
+            value={detail?.detailUrl ?? `https://www.autotrader.co.uk/car-details/${advertId}`}
+            label="Copy link"
+            copiedLabel="Copied ✓"
+          />
+        </footer>
       </div>
     </div>
   );

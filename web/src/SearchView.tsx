@@ -265,6 +265,10 @@ export function SearchView({ id, onEdit, onHome }: { id: string; onEdit: () => v
           advertId={openAdvertId}
           vrm={openListing?.vrm ?? null}
           onVrmSaved={() => void load()}
+          starred={openListing?.starred ?? false}
+          discarded={openListing?.discarded ?? false}
+          onToggleStar={toggleStar}
+          onDiscard={discard}
           onClose={() => setOpenAdvertId(null)}
         />
       )}
