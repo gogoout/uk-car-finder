@@ -6,6 +6,7 @@ import MIGRATION_2 from '../../migrations/0002_facet_cache.sql?raw';
 import MIGRATION_3 from '../../migrations/0003_globals_import_discard.sql?raw';
 import MIGRATION_4 from '../../migrations/0004_advert_text.sql?raw';
 import MIGRATION_5 from '../../migrations/0005_discard_reason.sql?raw';
+import MIGRATION_6 from '../../migrations/0006_gone.sql?raw';
 import type { Combo, SavedSearch, SearchListing } from '../../src/types';
 
 // The pool types `env` as `Cloudflare.Env`; declare the bindings our tests use.
@@ -32,7 +33,7 @@ const TABLES = [
 
 /** Applies the migration and empties every table, so each test starts clean. */
 export async function resetDb(): Promise<D1Database> {
-  const statements = [MIGRATION, MIGRATION_2, MIGRATION_3, MIGRATION_4, MIGRATION_5]
+  const statements = [MIGRATION, MIGRATION_2, MIGRATION_3, MIGRATION_4, MIGRATION_5, MIGRATION_6]
     .join(';\n')
     // Strip `--` comments first, or a comment-only tail parses as a statement.
     .replace(/^\s*--.*$/gm, '')

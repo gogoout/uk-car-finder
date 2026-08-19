@@ -362,6 +362,23 @@ describe('starring', () => {
   });
 });
 
+describe('the detail queue', () => {
+  it('gives an advert another chance when there is a fresh reason to look', async () => {
+    await db.enqueueDetail(DB, '1');
+    for (let i = 0; i < 3; i++) await db.recordQueueFailure(DB, '1', 'boom');
+
+    // Three failures and it is skipped for good — which is how every sold
+    // advert ended up queued forever without ever being confirmed as gone.
+    expect(await db.takeQueueBatch(DB, 10)).toHaveLength(0);
+
+    await db.enqueueDetail(DB, '1');
+
+    const batch = await db.takeQueueBatch(DB, 10);
+    expect(batch).toHaveLength(1);
+    expect(batch[0]!.attempts).toBe(0);
+  });
+});
+
 describe('reasons', () => {
   const seedOne = async () => {
     await db.upsertSearchListing(DB, searchListing());

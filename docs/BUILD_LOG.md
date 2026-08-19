@@ -5,6 +5,58 @@ discovered about AutoTrader that aren't obvious from the code. Newest first.
 
 ---
 
+## 2026-08-20 — Sold adverts, and three fixes from using it
+
+### The reason box had nowhere to live
+
+Discarding a car reloaded the results, a discarded car is filtered out of them,
+and so the card carrying the reason box vanished the instant the bin was
+pressed. The feature shipped yesterday could not be used at all.
+
+Decisions now patch the row on screen instead of reloading: the card stays,
+dimmed, with Undo and the reason box on it, until the next real load. That also
+gives an undo that doesn't depend on finding the "Discarded" filter.
+
+The pencil beside a reason was hover-only, which on a phone means invisible — an
+editable line looked like static text. It is always shown now, faintly.
+
+### Sold adverts were being reported as parser bugs
+
+"Hydration data had no loaderData[car-details].aggregatorAdvert" turned out to
+be the ordinary case: **AutoTrader keeps serving the page after a car sells**,
+with the hydration blob intact and simply carrying no advert. Treating that as a
+parse failure made every sold car look like a bug, and left it on the shortlist.
+
+That distinction is now a type. `AdvertGone` means the car has gone;
+`DetailParseError` still means their layout changed and we should hear about it.
+Gone adverts are recorded with the timestamp of the sighting, hidden by default
+behind a "Sold or gone (n)" toggle beside the discarded one, and shown with the
+price struck through when revealed. The row stays: the price history, and
+anything you wrote about the car, outlive the advert. Seeing it in search
+results again — or a detail page that parses — clears the mark, because relisted
+cars are common.
+
+### Why they had piled up
+
+`takeQueueBatch` skips anything that has failed three times. Every sold advert
+failed to parse three times, then sat in the queue forever: never fetched again,
+so never confirmed gone, so never hidden. 252 of them locally.
+
+Two changes fix it. Re-queueing now resets the attempt count — every caller
+enqueues *because something happened*, and a new reason to look is a new chance.
+And a refresh now queues the listings its run stopped returning: absence is a
+hint rather than a verdict, so it only ever schedules the detail fetch that
+actually decides. Verified locally: 11 dead adverts confirmed and hidden on
+sight, and all 34 unseen-but-alive listings queued for checking by the next run.
+
+### Footer
+
+Four labelled buttons wrapped onto two lines on a phone. The two secondary ones
+— AutoTrader and copy — are icons now, which is the same call made for the
+toolbar earlier, and for the same reason.
+
+---
+
 ## 2026-08-19 — MOT history: the odometer as evidence
 
 The DVSA credentials arrived, which exposed how lopsided the feature was: the

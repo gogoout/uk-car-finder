@@ -35,6 +35,10 @@ imported checks.
 Deltas: new since the last run, and price drops measured from the highest price
 ever observed.
 
+Cars that leave AutoTrader are tagged and hidden rather than deleted — sold
+adverts keep serving a page, so this is only ever learned by looking — and a
+relisted one comes back on its own.
+
 ## Setup
 
 ```bash

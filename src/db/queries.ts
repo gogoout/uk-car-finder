@@ -152,6 +152,9 @@ export async function upsertSearchListing(
          image_url = COALESCE(excluded.image_url, listings.image_url),
          -- Search badges are the freshest price-indicator source we have.
          price_indicator = COALESCE(excluded.price_indicator, listings.price_indicator),
+         -- Back in the search results, so it is not gone, whatever we last
+         -- concluded. Relisted cars are common enough to matter.
+         gone_at = NULL,
          last_seen_at = excluded.last_seen_at`,
     )
     .bind(
@@ -225,6 +228,8 @@ export async function applyDetail(
          price_indicator = COALESCE(?, price_indicator),
          -- Never overwrite a plate the user typed in with a null we scraped.
          vrm = COALESCE(vrm, ?),
+         -- We just read the advert, so it exists.
+         gone_at = NULL,
          detail_fetched_at = ?
        WHERE advert_id = ?`,
     )
@@ -311,11 +316,26 @@ export async function unlinkListingFromCombo(
 
 /* ----------------------------------------------------------------- fetch queue */
 
+/**
+ * Queues a detail fetch, and resets a queued one.
+ *
+ * `takeQueueBatch` skips anything that has failed three times, so an item that
+ * exhausted its attempts is invisible for good. That was fine while failures
+ * were transient — but every sold advert failed to parse three times and then
+ * sat there, never fetched again and so never confirmed as gone.
+ *
+ * Every caller enqueues because something happened: a new listing, a price
+ * change, an advert that stopped appearing. A new reason to look is a new
+ * chance, so the attempt count starts again.
+ */
 export async function enqueueDetail(db: D1Database, advertId: string): Promise<void> {
   await db
     .prepare(
       `INSERT INTO fetch_queue (advert_id, queued_at) VALUES (?, ?)
-       ON CONFLICT(advert_id) DO NOTHING`,
+       ON CONFLICT(advert_id) DO UPDATE SET
+         attempts = 0,
+         last_error = NULL,
+         queued_at = excluded.queued_at`,
     )
     .bind(advertId, now())
     .run();
@@ -485,6 +505,7 @@ interface ResultRow {
   star_note: string | null;
   discarded: number;
   discard_reason: string | null;
+  gone_at: string | null;
   advert_text: string | null;
 }
 
@@ -493,6 +514,8 @@ export interface ResultsOptions {
   excludeWriteOffs?: boolean;
   /** Show the cars you have discarded instead of hiding them. */
   includeDiscarded?: boolean;
+  /** Show cars AutoTrader no longer lists instead of hiding them. */
+  includeGone?: boolean;
 }
 
 export async function getResults(
@@ -575,6 +598,7 @@ export async function getResults(
       starNote: row.star_note,
       discarded: row.discarded > 0,
       discardReason: row.discard_reason,
+      goneAt: row.gone_at,
       // Derived, never stored: changing mentionsImport takes effect on every
       // listing at once rather than leaving old rows with a stale answer.
       advertText: row.advert_text,
@@ -634,6 +658,9 @@ export async function getResults(
     // Discarded cars stay in the database — price history and delta tracking
     // carry on — they are simply not shown unless asked for.
     if (listing.discarded && !opts.includeDiscarded) continue;
+    // A sold or withdrawn advert is noise on a shortlist, but the row stays so
+    // its price history — and anything you wrote about the car — survives.
+    if (listing.goneAt !== null && !opts.includeGone) continue;
     // Use the combo's current label rather than the one stored at link time.
     verified.push({ ...listing, matchedCombos: stillMatching.map((c) => c.label) });
   }
@@ -650,6 +677,61 @@ export async function getResults(
  * `undefined` leaves whatever is there alone — so toggling the star off and on
  * again doesn't silently wipe the reason you typed a fortnight ago.
  */
+/**
+ * Records that AutoTrader no longer has this advert.
+ *
+ * `COALESCE` keeps the first sighting: when it went is more useful than when we
+ * last confirmed it. Cleared by the advert turning up again, in either the
+ * search results or a detail page that parses.
+ */
+export async function markGone(db: D1Database, advertId: string, at = now()): Promise<void> {
+  await db
+    .prepare('UPDATE listings SET gone_at = COALESCE(gone_at, ?) WHERE advert_id = ?')
+    .bind(at, advertId)
+    .run();
+}
+
+/** How many of a search's results have vanished from AutoTrader. */
+export async function countGone(db: D1Database, searchId: string): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(DISTINCT sl.advert_id) AS n
+       FROM search_listings sl
+       JOIN listings l ON l.advert_id = sl.advert_id
+       WHERE sl.search_id = ? AND l.gone_at IS NOT NULL`,
+    )
+    .bind(searchId)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+/**
+ * Listings this search knows about that its latest run didn't return.
+ *
+ * Absence is a hint, not a verdict — a car can be missed because the search
+ * paged out — so these are only queued for a detail fetch, which is what
+ * actually decides. Anything already known to be gone is left out, or every
+ * refresh would re-queue the same dead adverts forever.
+ */
+export async function listUnseenSince(
+  db: D1Database,
+  searchId: string,
+  since: string,
+  limit = 200,
+): Promise<string[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT DISTINCT sl.advert_id AS advert_id
+       FROM search_listings sl
+       JOIN listings l ON l.advert_id = sl.advert_id
+       WHERE sl.search_id = ? AND l.gone_at IS NULL AND l.last_seen_at < ?
+       LIMIT ?`,
+    )
+    .bind(searchId, since, limit)
+    .all<{ advert_id: string }>();
+  return results.map((r) => r.advert_id);
+}
+
 export async function setStarred(
   db: D1Database,
   advertId: string,

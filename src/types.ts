@@ -221,6 +221,12 @@ export interface ResultListing
   /** Why you ruled it out — the thing you'll have forgotten in a fortnight. */
   discardReason: string | null;
   /**
+   * When AutoTrader stopped listing this advert, or null while it is still up.
+   * Sold and withdrawn cars are hidden by default rather than deleted: the
+   * price history, and anything you wrote about the car, are still worth having.
+   */
+  goneAt: string | null;
+  /**
    * Derived from `advertText` on read, never stored — so changing the detection
    * applies to every listing at once.
    */

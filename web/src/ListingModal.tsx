@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { api } from './api';
+import { api, ApiError } from './api';
 import { Gallery } from './Gallery';
 import { CopyButton } from './CopyButton';
 import { NoteField } from './NoteField';
 import { MotPanel } from './MotPanel';
 import { PRICE_LABELS, priceTone, SERVICE_LABELS, serviceTone } from './format';
 import type { FullDetail } from '../../src/autotrader/fullDetail';
-import { ChevronDown, ChevronRight, ExternalLink, Star, Trash2, Undo2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, Link2, Star, Trash2, Undo2, X } from 'lucide-react';
 
 /** Collapsible section, matching the accordion used by the filter editor. */
 function Section({
@@ -78,6 +78,7 @@ export function ListingModal({
   const [asking, setAsking] = useState<'star' | 'discard' | null>(null);
   const [detail, setDetail] = useState<FullDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [gone, setGone] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -85,7 +86,13 @@ export function ListingModal({
     api
       .getListingDetail(advertId)
       .then((data) => !cancelled && setDetail(data))
-      .catch((err: unknown) => !cancelled && setError(err instanceof Error ? err.message : 'Failed to load'));
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        // A sold advert is an answer, not a fault — and the server has just
+        // recorded it, so the card behind will carry the tag on the next load.
+        setGone(err instanceof ApiError && err.status === 404);
+        setError(err instanceof Error ? err.message : 'Failed to load');
+      });
     return () => {
       cancelled = true;
     };
@@ -106,6 +113,7 @@ export function ListingModal({
   }, [onClose]);
 
   const heading = detail?.title || 'Loading…';
+  const advertUrl = detail?.detailUrl ?? `https://www.autotrader.co.uk/car-details/${advertId}`;
 
   // Rendered in both branches below: MOT history comes from DVSA, so it is
   // still worth having on the days AutoTrader's advert won't load.
@@ -138,7 +146,7 @@ export function ListingModal({
         </header>
 
         <div className="modal-body">
-          {error && <div className="banner">{error}</div>}
+          {error && <div className={`banner${gone ? ' info' : ''}`}>{error}</div>}
 
           {error && motSection}
 
@@ -355,21 +363,26 @@ export function ListingModal({
 
           <span className="modal-foot-spacer" />
 
-          {/* Built from the id rather than the loaded advert, so the way out to
-              AutoTrader still works on the days their page won't parse. */}
+          {/* Icons, so the four actions stay on one line on a phone — and the
+              link is built from the id rather than the loaded advert, so the
+              way out to AutoTrader still works on the days their page won't
+              parse. */}
           <a
-            className="btn"
-            href={detail?.detailUrl ?? `https://www.autotrader.co.uk/car-details/${advertId}`}
+            className="btn icon"
+            href={advertUrl}
             target="_blank"
             rel="noreferrer"
+            aria-label="Open on AutoTrader"
+            title="Open on AutoTrader"
           >
-            AutoTrader
-            <ExternalLink size={16} aria-hidden="true" />
+            <ExternalLink size={18} aria-hidden="true" />
           </a>
           <CopyButton
-            value={detail?.detailUrl ?? `https://www.autotrader.co.uk/car-details/${advertId}`}
-            label="Copy link"
-            copiedLabel="Copied ✓"
+            value={advertUrl}
+            className="icon"
+            ariaLabel="Copy link to this advert"
+            title="Copy link"
+            icon={<Link2 size={18} aria-hidden="true" />}
           />
           </div>
         </footer>

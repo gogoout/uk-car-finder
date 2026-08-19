@@ -27,6 +27,7 @@ export async function refreshSearch(
   search: SavedSearch,
   opts: RefreshOptions = {},
 ): Promise<RefreshResult> {
+  const runStartedAt = new Date().toISOString();
   const runId = await db.startRun(database, search.id);
   let pagesFetched = 0;
   let listingsSeen = 0;
@@ -84,6 +85,19 @@ export async function refreshSearch(
     } catch (err) {
       // One bad combo shouldn't cost us the other combos' results.
       failures.push(`${combo.label}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  // Anything this search knew about that the run didn't return is a candidate
+  // for having sold. Absence alone isn't proof — a car can be missed because
+  // the search paged out — so they are only queued, and the detail fetch is
+  // what decides. Skipped when the run failed, since a failed run explains the
+  // absence on its own.
+  let queuedForCheck = 0;
+  if (failures.length === 0) {
+    for (const advertId of await db.listUnseenSince(database, search.id, runStartedAt)) {
+      await db.enqueueDetail(database, advertId);
+      queuedForCheck++;
     }
   }
 
